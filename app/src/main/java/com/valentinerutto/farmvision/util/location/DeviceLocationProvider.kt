@@ -6,6 +6,7 @@ import android.content.Context
 import android.content.pm.PackageManager
 import android.content.IntentSender
 import android.location.Location
+import android.location.Geocoder
 import androidx.core.content.ContextCompat
 import com.google.android.gms.location.FusedLocationProviderClient
 import com.google.android.gms.location.LocationRequest
@@ -15,7 +16,10 @@ import com.google.android.gms.location.Priority
 import com.google.android.gms.common.api.ResolvableApiException
 import com.google.android.gms.tasks.CancellationTokenSource
 import com.google.android.gms.tasks.Task
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.suspendCancellableCoroutine
+import kotlinx.coroutines.withContext
+import java.util.Locale
 import kotlin.coroutines.resume
 
 data class CurrentLocation(
@@ -34,6 +38,12 @@ sealed interface LocationSettingsResult {
     data object Enabled : LocationSettingsResult
     data class ResolutionRequired(val intentSender: IntentSender) : LocationSettingsResult
     data class Error(val message: String) : LocationSettingsResult
+}
+
+sealed interface LocationNameResult {
+    data class Success(val name: String) : LocationNameResult
+    data object Unavailable : LocationNameResult
+    data class Error(val message: String) : LocationNameResult
 }
 
 class DeviceLocationProvider(
@@ -85,6 +95,40 @@ class DeviceLocationProvider(
         return settingsClient.checkLocationSettings(settingsRequest).awaitSettings()
     }
 
+    @Suppress("DEPRECATION")
+    suspend fun getLocationName(location: CurrentLocation): LocationNameResult {
+        return withContext(Dispatchers.IO) {
+            runCatching {
+                val address = Geocoder(appContext, Locale.getDefault())
+                    .getFromLocation(
+                        location.latitude,
+                        location.longitude,
+                        MAX_GEOCODER_RESULTS
+                    )
+                    ?.firstOrNull()
+
+                val locationName = address?.let {
+                    listOfNotNull(
+                        it.locality ?: it.subLocality ?: it.subAdminArea,
+                        it.adminArea ?: it.countryName
+                    )
+                        .distinct()
+                        .joinToString(", ")
+                }.orEmpty()
+
+                if (locationName.isBlank()) {
+                    LocationNameResult.Unavailable
+                } else {
+                    LocationNameResult.Success(locationName)
+                }
+            }.getOrElse { exception ->
+                LocationNameResult.Error(
+                    exception.message ?: "Unable to get location name"
+                )
+            }
+        }
+    }
+
     @SuppressLint("MissingPermission")
     private suspend fun getFreshLocation(): Location? {
         val cancellationTokenSource = CancellationTokenSource()
@@ -127,6 +171,7 @@ class DeviceLocationProvider(
 }
 
 private const val LOCATION_REQUEST_INTERVAL_MILLIS = 10_000L
+private const val MAX_GEOCODER_RESULTS = 1
 
 private suspend fun Task<*>.awaitSettings(): LocationSettingsResult {
     return suspendCancellableCoroutine { continuation ->

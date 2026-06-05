@@ -47,6 +47,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -84,9 +85,9 @@ import com.valentinerutto.farmvision.ui.theme.RainBlue
 import com.valentinerutto.farmvision.ui.theme.ScreenBackground
 import com.valentinerutto.farmvision.ui.theme.SunYellow
 import com.valentinerutto.farmvision.util.location.DeviceLocationProvider
+import com.valentinerutto.farmvision.util.location.LocationNameResult
 import com.valentinerutto.farmvision.util.location.LocationSettingsResult
 import com.valentinerutto.farmvision.util.location.LocationResult
-import com.valentinerutto.farmvision.util.toDayOfWeek
 import com.valentinerutto.farmvision.util.updatedTimeLabel
 import kotlinx.coroutines.launch
 import org.koin.androidx.compose.koinViewModel
@@ -110,6 +111,8 @@ fun HomeScreen(
 
     var locationErrorMessage by remember { mutableStateOf<String?>(null) }
     var showTurnOnGpsAction by remember { mutableStateOf(false) }
+    var selectedForecastIndex by remember { mutableIntStateOf(0) }
+    var locationName by remember { mutableStateOf("Current location") }
 
     val locationProvider = remember(context) { DeviceLocationProvider(context) }
 
@@ -134,6 +137,7 @@ fun HomeScreen(
                 loadWeatherFromCurrentLocation(
                     locationProvider = locationProvider,
                     weatherViewModel = weatherViewModel,
+                    onLocationNameChanged = { name -> locationName = name },
                     onLocationError = ::showLocationError
                 )
             }
@@ -153,6 +157,7 @@ fun HomeScreen(
                     loadWeatherFromCurrentLocation(
                         locationProvider = locationProvider,
                         weatherViewModel = weatherViewModel,
+                        onLocationNameChanged = { name -> locationName = name },
                         onLocationError = ::showLocationError
                     )
                 }
@@ -181,12 +186,13 @@ fun HomeScreen(
             loadWeatherFromCurrentLocation(
                 locationProvider = locationProvider,
                 weatherViewModel = weatherViewModel,
+                onLocationNameChanged = { name -> locationName = name },
                 onLocationError = ::showLocationError
             )
         }
     }
 
-    val forecastDays = uiState.weather.toForecastDays()
+    val forecastDays = uiState.weather.toForecastDays(selectedForecastIndex)
 
     Scaffold(
         modifier = modifier.fillMaxSize(),
@@ -202,6 +208,7 @@ fun HomeScreen(
                 .verticalScroll(rememberScrollState()),
         ) {
             HomeHeader(
+                locationName = locationName,
                 isRefreshing = uiState.isLoading,
                 onRefresh = ::refreshWeather
             )
@@ -210,7 +217,10 @@ fun HomeScreen(
                 WeatherErrorText(message = message)
             }
             SectionTitle("5-day forecast")
-            ForecastRow(forecastDays)
+            ForecastRow(
+                days = forecastDays,
+                onForecastClick = { index -> selectedForecastIndex = index }
+            )
             AiInsightCard()
             ScanFarmButton()
             Spacer(modifier = Modifier.height(20.dp))
@@ -227,18 +237,18 @@ fun HomeScreen(
     }
 }
 
-private fun WeatherUiData?.toForecastDays(): List<ForecastDay> {
+private fun WeatherUiData?.toForecastDays(selectedIndex: Int): List<ForecastDay> {
 
     val dailyWeather = this?.dailyWeather.orEmpty()
 
     if (dailyWeather.isEmpty()) {
         return listOf(
             ForecastDay("Mon", "23°", Mint),
-            ForecastDay("Tue", "26°", SunYellow, selected = true),
+            ForecastDay("Tue", "26°", SunYellow),
             ForecastDay("Wed", "19°", RainBlue),
             ForecastDay("Thu", "18°", RainBlue),
             ForecastDay("Fri", "22°", Mint),
-        )
+        ).withSelectedIndex(selectedIndex)
 
     }
 
@@ -247,8 +257,14 @@ private fun WeatherUiData?.toForecastDays(): List<ForecastDay> {
             day = daily.dayOfTheWeek,
             temperature = "${daily.temp_max.toInt()}°",
             markerColor = daily.condition_code.toWeatherMarkerColor(),
-            selected = index == 0
+            selected = index == selectedIndex
         )
+    }
+}
+
+private fun List<ForecastDay>.withSelectedIndex(selectedIndex: Int): List<ForecastDay> {
+    return mapIndexed { index, forecastDay ->
+        forecastDay.copy(selected = index == selectedIndex)
     }
 }
 
@@ -266,12 +282,22 @@ private fun String.toWeatherMarkerColor(): Color {
 private suspend fun loadWeatherFromCurrentLocation(
     locationProvider: DeviceLocationProvider,
     weatherViewModel: WeatherViewModel,
+    onLocationNameChanged: (String) -> Unit,
     onLocationError: (message: String, canTurnOnGps: Boolean) -> Unit
 ) {
 
     when (val locationResult = locationProvider.getCurrentLocation()) {
 
         is LocationResult.Success -> {
+            when (val nameResult = locationProvider.getLocationName(locationResult.location)) {
+                is LocationNameResult.Success -> {
+                    onLocationNameChanged(nameResult.name)
+                }
+
+                LocationNameResult.Unavailable -> Unit
+                is LocationNameResult.Error -> Unit
+            }
+
             weatherViewModel.loadWeather(
                 lat = locationResult.location.latitude,
                 lon = locationResult.location.longitude
@@ -338,6 +364,7 @@ private fun LocationErrorDialog(
 
 @Composable
 private fun HomeHeader(
+    locationName: String,
     isRefreshing: Boolean,
     onRefresh: () -> Unit,
 ) {
@@ -382,7 +409,7 @@ private fun HomeHeader(
             )
             Spacer(modifier = Modifier.width(3.dp))
             Text(
-                text = "Bomet Central, Rift Valley",
+                text = locationName,
                 color = DeepGreen,
                 fontSize = 12.sp,
                 maxLines = 1,
@@ -528,16 +555,20 @@ private fun SectionTitle(title: String) {
 }
 
 @Composable
-private fun ForecastRow(days: List<ForecastDay>) {
+private fun ForecastRow(
+    days: List<ForecastDay>,
+    onForecastClick: (Int) -> Unit,
+) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
             .padding(horizontal = 16.dp),
         horizontalArrangement = Arrangement.spacedBy(8.dp),
     ) {
-        days.forEach { day ->
+        days.forEachIndexed { index, day ->
             ForecastChip(
                 day = day,
+                onClick = { onForecastClick(index) },
                 modifier = Modifier.weight(1f),
             )
         }
@@ -547,6 +578,7 @@ private fun ForecastRow(days: List<ForecastDay>) {
 @Composable
 private fun ForecastChip(
     day: ForecastDay,
+    onClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val background = if (day.selected) InsightGreen else Color.White
@@ -555,6 +587,7 @@ private fun ForecastChip(
     Column(
         modifier = modifier
             .clip(RoundedCornerShape(12.dp))
+            .clickable(onClick = onClick)
             .background(background)
             .border(0.5.dp, borderColor, RoundedCornerShape(12.dp))
             .padding(horizontal = 4.dp, vertical = 9.dp),

@@ -75,4 +75,3 @@ fun mapToDailyWeatherEntity(weatherResponse: WeatherResponse): List<DailyWeather
 
 }
 
-private const val LATEST_WEATHER_ID = "latest"
