@@ -19,34 +19,51 @@ data class CurrentLocation(
     val longitude: Double
 )
 
-class DeviceLocationProvider(context: Context) {
+sealed interface LocationResult {
+    data class Success(val location: CurrentLocation) : LocationResult
+    data object PermissionDenied : LocationResult
+    data object LocationUnavailable : LocationResult
+    data class Error(val message: String) : LocationResult
+}
 
+class DeviceLocationProvider(
+    context: Context
+) {
     private val appContext = context.applicationContext
+
     private val fusedLocationClient: FusedLocationProviderClient =
         LocationServices.getFusedLocationProviderClient(appContext)
 
     fun hasLocationPermission(): Boolean {
+        return hasPermission(Manifest.permission.ACCESS_FINE_LOCATION) ||
+                hasPermission(Manifest.permission.ACCESS_COARSE_LOCATION)
+    }
+
+    private fun hasPermission(permission: String): Boolean {
         return ContextCompat.checkSelfPermission(
             appContext,
-            Manifest.permission.ACCESS_FINE_LOCATION
-        ) == PackageManager.PERMISSION_GRANTED ||
-            ContextCompat.checkSelfPermission(
-                appContext,
-                Manifest.permission.ACCESS_COARSE_LOCATION
-            ) == PackageManager.PERMISSION_GRANTED
+            permission
+        ) == PackageManager.PERMISSION_GRANTED
     }
 
     @SuppressLint("MissingPermission")
-    suspend fun getCurrentLocation(): CurrentLocation? {
-        if (!hasLocationPermission()) return null
+    suspend fun getCurrentLocation(): LocationResult {
+        if (!hasLocationPermission()) {
+            return LocationResult.PermissionDenied
+        }
 
-        val lastLocation = fusedLocationClient.lastLocation.awaitLocation()
-        val location = lastLocation ?: getFreshLocation()
+        return try {
+            val cachedLocation = fusedLocationClient.lastLocation.await()
+            val location = cachedLocation ?: getFreshLocation()
 
-        return location?.let {
-            CurrentLocation(
-                latitude = it.latitude,
-                longitude = it.longitude
+            if (location == null) {
+                LocationResult.LocationUnavailable
+            } else {
+                LocationResult.Success(location.toCurrentLocation())
+            }
+        } catch (exception: Exception) {
+            LocationResult.Error(
+                exception.message ?: "Unable to get current location"
             )
         }
     }
@@ -54,38 +71,53 @@ class DeviceLocationProvider(context: Context) {
     @SuppressLint("MissingPermission")
     private suspend fun getFreshLocation(): Location? {
         val cancellationTokenSource = CancellationTokenSource()
+
         return fusedLocationClient
             .getCurrentLocation(
                 Priority.PRIORITY_BALANCED_POWER_ACCURACY,
                 cancellationTokenSource.token
             )
-            .awaitLocation {
-                cancellationTokenSource.cancel()
-            }
+            .await(
+                onCancel = {
+                    cancellationTokenSource.cancel()
+                }
+            )
+    }
+
+    private fun Location.toCurrentLocation(): CurrentLocation {
+        return CurrentLocation(
+            latitude = latitude,
+            longitude = longitude
+        )
     }
 }
 
-private suspend fun Task<Location>.awaitLocation(
+private suspend fun Task<Location>.await(
     onCancel: () -> Unit = {}
 ): Location? {
     return suspendCancellableCoroutine { continuation ->
+
         addOnSuccessListener { location ->
             if (continuation.isActive) {
                 continuation.resume(location)
             }
         }
-        addOnFailureListener {
+
+        addOnFailureListener { exception ->
             if (continuation.isActive) {
-                continuation.resume(null)
+                continuation.cancel(exception)
             }
         }
+
         addOnCanceledListener {
             if (continuation.isActive) {
                 continuation.resume(null)
             }
         }
+
         continuation.invokeOnCancellation {
             onCancel()
         }
     }
 }
+

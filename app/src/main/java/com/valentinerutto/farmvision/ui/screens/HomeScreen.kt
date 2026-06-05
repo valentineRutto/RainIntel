@@ -57,7 +57,6 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
-import com.valentinerutto.farmvision.util.location.DeviceLocationProvider
 import com.valentinerutto.farmvision.data.models.ForecastDay
 import com.valentinerutto.farmvision.ui.WeatherViewModel
 import com.valentinerutto.farmvision.ui.theme.BottomNavContentInactive
@@ -76,6 +75,8 @@ import com.valentinerutto.farmvision.ui.theme.Mint
 import com.valentinerutto.farmvision.ui.theme.RainBlue
 import com.valentinerutto.farmvision.ui.theme.ScreenBackground
 import com.valentinerutto.farmvision.ui.theme.SunYellow
+import com.valentinerutto.farmvision.util.location.DeviceLocationProvider
+import com.valentinerutto.farmvision.util.location.LocationResult
 import kotlinx.coroutines.launch
 import org.koin.androidx.compose.koinViewModel
 
@@ -168,15 +169,25 @@ private suspend fun loadWeatherFromCurrentLocation(
     weatherViewModel: WeatherViewModel
 ) {
 
-    val currentLocation = locationProvider.getCurrentLocation()
+    when (val locationResult = locationProvider.getCurrentLocation()) {
+        is LocationResult.Success -> {
+            weatherViewModel.loadWeather(
+                lat = locationResult.location.latitude,
+                lon = locationResult.location.longitude
+            )
+        }
 
-    if (currentLocation != null) {
-        weatherViewModel.loadWeather(
-            lat = currentLocation.latitude,
-            lon = currentLocation.longitude
-        )
-    } else {
-        weatherViewModel.onLocationError("Unable to get your current location")
+        LocationResult.PermissionDenied -> {
+            weatherViewModel.onLocationError("Location permission is required to load local weather")
+        }
+
+        LocationResult.LocationUnavailable -> {
+            weatherViewModel.onLocationError("Unable to get your current location")
+        }
+
+        is LocationResult.Error -> {
+            weatherViewModel.onLocationError(locationResult.message)
+        }
     }
 }
 
