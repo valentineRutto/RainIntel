@@ -6,10 +6,10 @@ import retrofit2.http.POST
 interface ApiService {
 
     @GET("weather-geo")
-    suspend fun getWeatherForecast()
+    suspend fun getWeatherForecast(): WeatherResponse
 
     @POST("trees/analyze")
-    suspend fun getAnalyzedImage()
+    suspend fun getAnalyzedImage() : TreeAnalysisResponse
 
 
 
