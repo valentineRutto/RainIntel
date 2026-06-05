@@ -47,15 +47,7 @@ class DeviceLocationProvider(
     private val settingsClient = LocationServices.getSettingsClient(appContext)
 
     fun hasLocationPermission(): Boolean {
-        return hasPermission(Manifest.permission.ACCESS_FINE_LOCATION) ||
-                hasPermission(Manifest.permission.ACCESS_COARSE_LOCATION)
-    }
-
-    private fun hasPermission(permission: String): Boolean {
-        return ContextCompat.checkSelfPermission(
-            appContext,
-            permission
-        ) == PackageManager.PERMISSION_GRANTED
+        return hasLocationPermission(appContext)
     }
 
     @SuppressLint("MissingPermission")
@@ -114,6 +106,23 @@ class DeviceLocationProvider(
             latitude = latitude,
             longitude = longitude
         )
+    }
+
+    companion object {
+        val LOCATION_PERMISSIONS: Array<String>
+            get() = arrayOf(
+                Manifest.permission.ACCESS_FINE_LOCATION,
+                Manifest.permission.ACCESS_COARSE_LOCATION
+            )
+
+        fun hasLocationPermission(context: Context): Boolean {
+            return LOCATION_PERMISSIONS.any { permission ->
+                ContextCompat.checkSelfPermission(
+                    context,
+                    permission
+                ) == PackageManager.PERMISSION_GRANTED
+            }
+        }
     }
 }
 

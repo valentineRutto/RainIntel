@@ -1,7 +1,6 @@
 package com.valentinerutto.farmvision.ui.screens
 
-import android.Manifest
-import android.content.pm.PackageManager
+import android.app.Activity
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.IntentSenderRequest
 import androidx.activity.result.contract.ActivityResultContracts
@@ -63,7 +62,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.core.content.ContextCompat
+import com.valentinerutto.farmvision.R
 import com.valentinerutto.farmvision.data.local.WeatherEntity
 import com.valentinerutto.farmvision.data.models.ForecastDay
 import com.valentinerutto.farmvision.data.models.WeatherUiData
@@ -106,55 +105,40 @@ fun HomeScreen(
     val context = LocalContext.current
     val coroutineScope = rememberCoroutineScope()
     val uiState by weatherViewModel.uiState.collectAsState()
+
     var locationErrorMessage by remember { mutableStateOf<String?>(null) }
     var showTurnOnGpsAction by remember { mutableStateOf(false) }
 
     val locationProvider = remember(context) { DeviceLocationProvider(context) }
 
-    val locationPermissions = remember {
-        arrayOf(
-            Manifest.permission.ACCESS_FINE_LOCATION,
-            Manifest.permission.ACCESS_COARSE_LOCATION
-        )
+    fun showLocationError(message: String, canTurnOnGps: Boolean = false) {
+        locationErrorMessage = message
+        showTurnOnGpsAction = canTurnOnGps
     }
 
-    val locationPermissionLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.RequestMultiplePermissions()
-    ) { permissions ->
-
-        val hasPermission = permissions.values.any { isGranted -> isGranted }
-
-        if (hasPermission) {
-            coroutineScope.launch {
-                loadWeatherFromCurrentLocation(
-                    locationProvider = locationProvider,
-                    weatherViewModel = weatherViewModel,
-                    onLocationError = { message, canTurnOnGps ->
-                        locationErrorMessage = message
-                        showTurnOnGpsAction = canTurnOnGps
-                    }
-                )
-            }
-        } else {
-            locationErrorMessage = "Location permission is required to load local weather"
-            showTurnOnGpsAction = false
-        }
-
+    fun clearLocationError() {
+        locationErrorMessage = null
+        showTurnOnGpsAction = false
     }
 
     val locationSettingsLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.StartIntentSenderForResult()
-    ) {
-        locationErrorMessage = null
-        showTurnOnGpsAction = false
-        coroutineScope.launch {
-            loadWeatherFromCurrentLocation(
-                locationProvider = locationProvider,
-                weatherViewModel = weatherViewModel,
-                onLocationError = { message, canTurnOnGps ->
-                    locationErrorMessage = message
-                    showTurnOnGpsAction = canTurnOnGps
-                }
+    ) { result ->
+
+        clearLocationError()
+        
+        if (result.resultCode == Activity.RESULT_OK) {
+            coroutineScope.launch {
+                loadWeatherFromCurrentLocation(
+                    locationProvider = locationProvider,
+                    weatherViewModel = weatherViewModel,
+                    onLocationError = ::showLocationError
+                )
+            }
+        } else {
+            showLocationError(
+                message = context.getString(R.string.turn_on_gps_to_load_weather_for_your_current_location),
+                canTurnOnGps = true
             )
         }
     }
@@ -163,15 +147,11 @@ fun HomeScreen(
         coroutineScope.launch {
             when (val settingsResult = locationProvider.getLocationSettingsResult()) {
                 LocationSettingsResult.Enabled -> {
-                    locationErrorMessage = null
-                    showTurnOnGpsAction = false
+                    clearLocationError()
                     loadWeatherFromCurrentLocation(
                         locationProvider = locationProvider,
                         weatherViewModel = weatherViewModel,
-                        onLocationError = { message, canTurnOnGps ->
-                            locationErrorMessage = message
-                            showTurnOnGpsAction = canTurnOnGps
-                        }
+                        onLocationError = ::showLocationError
                     )
                 }
 
@@ -182,31 +162,25 @@ fun HomeScreen(
                 }
 
                 is LocationSettingsResult.Error -> {
-                    locationErrorMessage = settingsResult.message
-                    showTurnOnGpsAction = false
+                    showLocationError(settingsResult.message)
                 }
             }
         }
     }
 
     fun refreshWeather() {
-        val hasLocationPermission = locationPermissions.any { permission ->
-            ContextCompat.checkSelfPermission(context, permission) == PackageManager.PERMISSION_GRANTED
+        if (!locationProvider.hasLocationPermission()) {
+            showLocationError(context.getString(R.string.location_permission_is_required_to_load_local_weather))
+            return
         }
 
-        if (hasLocationPermission) {
-            coroutineScope.launch {
-                loadWeatherFromCurrentLocation(
-                    locationProvider = locationProvider,
-                    weatherViewModel = weatherViewModel,
-                    onLocationError = { message, canTurnOnGps ->
-                        locationErrorMessage = message
-                        showTurnOnGpsAction = canTurnOnGps
-                    }
-                )
-            }
-        } else {
-            locationPermissionLauncher.launch(locationPermissions)
+        coroutineScope.launch {
+            
+            loadWeatherFromCurrentLocation(
+                locationProvider = locationProvider,
+                weatherViewModel = weatherViewModel,
+                onLocationError = ::showLocationError
+            )
         }
     }
 
@@ -246,16 +220,15 @@ fun HomeScreen(
             message = message,
             showTurnOnGpsAction = showTurnOnGpsAction,
             onTurnOnGps = ::showTurnOnGpsPrompt,
-            onDismiss = {
-                locationErrorMessage = null
-                showTurnOnGpsAction = false
-            }
+            onDismiss = ::clearLocationError
         )
     }
 }
 
 private fun WeatherUiData?.toForecastDays(): List<ForecastDay> {
+
     val dailyWeather = this?.dailyWeather.orEmpty()
+
     if (dailyWeather.isEmpty()) {
         return listOf(
             ForecastDay("Mon", "23°", Mint),
@@ -264,6 +237,7 @@ private fun WeatherUiData?.toForecastDays(): List<ForecastDay> {
             ForecastDay("Thu", "18°", RainBlue),
             ForecastDay("Fri", "22°", Mint),
         )
+
     }
 
     return dailyWeather.take(5).mapIndexed { index, daily ->
