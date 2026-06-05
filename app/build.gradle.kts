@@ -1,4 +1,5 @@
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
+import java.util.Properties
 
 plugins {
     alias(libs.plugins.android.application)
@@ -16,7 +17,11 @@ android {
             minorApiLevel = 1
         }
     }
-
+    packaging {
+        resources {
+            excludes += "/META-INF/*"
+        }
+    }
     defaultConfig {
         applicationId = "com.valentinerutto.farmvision"
         minSdk = 24
@@ -25,7 +30,15 @@ android {
         versionName = "1.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+
+        val properties = Properties()
+        properties.load(project.rootProject.file("local.properties").inputStream())
+
+        buildConfigField("String", "WEATHER_API_KEY", "\"${properties.getProperty("WEATHER_API_KEY")}\"")
+
     }
+
+
 
     buildTypes {
         all {

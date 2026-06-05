@@ -40,6 +40,16 @@ object RetrofitClient {
     fun provideOkHttpClient(): OkHttpClient {
         return OkHttpClient.Builder()
             .addInterceptor(createLoggingInterceptor())
+            .addInterceptor { chain ->
+            chain.proceed(
+                chain.request().newBuilder()
+                    .addHeader(
+                        "Authorization",
+                        "Bearer ${BuildConfig.WEATHER_API_KEY}"
+                    )
+                    .build()
+            )
+        }
             .connectTimeout(30, TimeUnit.SECONDS)
             .readTimeout(30, TimeUnit.SECONDS)
             .build()
