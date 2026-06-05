@@ -1,4 +1,4 @@
-package com.valentinerutto.farmvision.data.network
+package com.valentinerutto.farmvision.data.network.response
 
 data class Current(
     val condition_code: String?,

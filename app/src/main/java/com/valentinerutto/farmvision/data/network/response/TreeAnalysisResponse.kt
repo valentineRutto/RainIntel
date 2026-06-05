@@ -1,4 +1,4 @@
-package com.valentinerutto.farmvision.data.network
+package com.valentinerutto.farmvision.data.network.response
 
 data class TreeAnalysisResponse(
     val analysis_id: String?,
