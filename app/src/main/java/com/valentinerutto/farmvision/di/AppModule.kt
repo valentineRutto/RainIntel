@@ -19,6 +19,7 @@ import retrofit2.Retrofit
 
 
  val networkingModule = module {
+
         single { RetrofitClient.provideOkHttpClient() }
         single { RetrofitClient.provideRetrofit(RetrofitClient.BASE_URL, get()) }
 
