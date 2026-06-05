@@ -3,6 +3,7 @@ package com.valentinerutto.farmvision.ui.screens
 import android.Manifest
 import android.content.pm.PackageManager
 import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.IntentSenderRequest
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -31,20 +32,26 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CameraAlt
 import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.Home
+import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.outlined.LocationOn
 import androidx.compose.material.icons.outlined.WbSunny
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -57,7 +64,9 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
+import com.valentinerutto.farmvision.data.local.WeatherEntity
 import com.valentinerutto.farmvision.data.models.ForecastDay
+import com.valentinerutto.farmvision.data.models.WeatherUiData
 import com.valentinerutto.farmvision.ui.WeatherViewModel
 import com.valentinerutto.farmvision.ui.theme.BottomNavContentInactive
 import com.valentinerutto.farmvision.ui.theme.BottomNavIndicatorInactive
@@ -76,6 +85,7 @@ import com.valentinerutto.farmvision.ui.theme.RainBlue
 import com.valentinerutto.farmvision.ui.theme.ScreenBackground
 import com.valentinerutto.farmvision.ui.theme.SunYellow
 import com.valentinerutto.farmvision.util.location.DeviceLocationProvider
+import com.valentinerutto.farmvision.util.location.LocationSettingsResult
 import com.valentinerutto.farmvision.util.location.LocationResult
 import kotlinx.coroutines.launch
 import org.koin.androidx.compose.koinViewModel
@@ -92,8 +102,12 @@ fun HomeScreen(
     modifier: Modifier = Modifier,
     weatherViewModel: WeatherViewModel = koinViewModel(),
 ) {
+
     val context = LocalContext.current
     val coroutineScope = rememberCoroutineScope()
+    val uiState by weatherViewModel.uiState.collectAsState()
+    var locationErrorMessage by remember { mutableStateOf<String?>(null) }
+    var showTurnOnGpsAction by remember { mutableStateOf(false) }
 
     val locationProvider = remember(context) { DeviceLocationProvider(context) }
 
@@ -112,33 +126,91 @@ fun HomeScreen(
 
         if (hasPermission) {
             coroutineScope.launch {
-                loadWeatherFromCurrentLocation(locationProvider, weatherViewModel)
+                loadWeatherFromCurrentLocation(
+                    locationProvider = locationProvider,
+                    weatherViewModel = weatherViewModel,
+                    onLocationError = { message, canTurnOnGps ->
+                        locationErrorMessage = message
+                        showTurnOnGpsAction = canTurnOnGps
+                    }
+                )
             }
         } else {
-            weatherViewModel.onLocationError("Location permission is required to load local weather")
+            locationErrorMessage = "Location permission is required to load local weather"
+            showTurnOnGpsAction = false
         }
 
     }
 
-    LaunchedEffect(Unit) {
+    val locationSettingsLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.StartIntentSenderForResult()
+    ) {
+        locationErrorMessage = null
+        showTurnOnGpsAction = false
+        coroutineScope.launch {
+            loadWeatherFromCurrentLocation(
+                locationProvider = locationProvider,
+                weatherViewModel = weatherViewModel,
+                onLocationError = { message, canTurnOnGps ->
+                    locationErrorMessage = message
+                    showTurnOnGpsAction = canTurnOnGps
+                }
+            )
+        }
+    }
+
+    fun showTurnOnGpsPrompt() {
+        coroutineScope.launch {
+            when (val settingsResult = locationProvider.getLocationSettingsResult()) {
+                LocationSettingsResult.Enabled -> {
+                    locationErrorMessage = null
+                    showTurnOnGpsAction = false
+                    loadWeatherFromCurrentLocation(
+                        locationProvider = locationProvider,
+                        weatherViewModel = weatherViewModel,
+                        onLocationError = { message, canTurnOnGps ->
+                            locationErrorMessage = message
+                            showTurnOnGpsAction = canTurnOnGps
+                        }
+                    )
+                }
+
+                is LocationSettingsResult.ResolutionRequired -> {
+                    locationSettingsLauncher.launch(
+                        IntentSenderRequest.Builder(settingsResult.intentSender).build()
+                    )
+                }
+
+                is LocationSettingsResult.Error -> {
+                    locationErrorMessage = settingsResult.message
+                    showTurnOnGpsAction = false
+                }
+            }
+        }
+    }
+
+    fun refreshWeather() {
         val hasLocationPermission = locationPermissions.any { permission ->
             ContextCompat.checkSelfPermission(context, permission) == PackageManager.PERMISSION_GRANTED
         }
 
         if (hasLocationPermission) {
-            loadWeatherFromCurrentLocation(locationProvider, weatherViewModel)
+            coroutineScope.launch {
+                loadWeatherFromCurrentLocation(
+                    locationProvider = locationProvider,
+                    weatherViewModel = weatherViewModel,
+                    onLocationError = { message, canTurnOnGps ->
+                        locationErrorMessage = message
+                        showTurnOnGpsAction = canTurnOnGps
+                    }
+                )
+            }
         } else {
             locationPermissionLauncher.launch(locationPermissions)
         }
     }
 
-    val forecastDays = listOf(
-        ForecastDay("Mon", "23°", Mint),
-        ForecastDay("Tue", "26°", SunYellow, selected = true),
-        ForecastDay("Wed", "19°", RainBlue),
-        ForecastDay("Thu", "18°", RainBlue),
-        ForecastDay("Fri", "22°", Mint),
-    )
+    val forecastDays = uiState.weather.toForecastDays()
 
     Scaffold(
         modifier = modifier.fillMaxSize(),
@@ -153,8 +225,14 @@ fun HomeScreen(
                 .windowInsetsPadding(WindowInsets.statusBars)
                 .verticalScroll(rememberScrollState()),
         ) {
-            HomeHeader()
-            WeatherHeroCard()
+            HomeHeader(
+                isRefreshing = uiState.isLoading,
+                onRefresh = ::refreshWeather
+            )
+            WeatherHeroCard(weather = uiState.weather)
+            uiState.errorMessage?.let { message ->
+                WeatherErrorText(message = message)
+            }
             SectionTitle("7-day forecast")
             ForecastRow(forecastDays)
             AiInsightCard()
@@ -162,14 +240,65 @@ fun HomeScreen(
             Spacer(modifier = Modifier.height(20.dp))
         }
     }
+
+    locationErrorMessage?.let { message ->
+        LocationErrorDialog(
+            message = message,
+            showTurnOnGpsAction = showTurnOnGpsAction,
+            onTurnOnGps = ::showTurnOnGpsPrompt,
+            onDismiss = {
+                locationErrorMessage = null
+                showTurnOnGpsAction = false
+            }
+        )
+    }
+}
+
+private fun WeatherUiData?.toForecastDays(): List<ForecastDay> {
+    val dailyWeather = this?.dailyWeather.orEmpty()
+    if (dailyWeather.isEmpty()) {
+        return listOf(
+            ForecastDay("Mon", "23°", Mint),
+            ForecastDay("Tue", "26°", SunYellow, selected = true),
+            ForecastDay("Wed", "19°", RainBlue),
+            ForecastDay("Thu", "18°", RainBlue),
+            ForecastDay("Fri", "22°", Mint),
+        )
+    }
+
+    return dailyWeather.take(5).mapIndexed { index, daily ->
+        ForecastDay(
+            day = daily.date.toDayLabel(),
+            temperature = "${daily.temp_max.toInt()}°",
+            markerColor = daily.condition_code.toWeatherMarkerColor(),
+            selected = index == 0
+        )
+    }
+}
+
+private fun String.toDayLabel(): String {
+    return takeIf { it.isNotBlank() }
+        ?.substringAfterLast("-")
+        ?: "--"
+}
+
+private fun String.toWeatherMarkerColor(): Color {
+    val condition = lowercase()
+    return when {
+        "rain" in condition || "shower" in condition -> RainBlue
+        "sun" in condition || "clear" in condition -> SunYellow
+        else -> Mint
+    }
 }
 
 private suspend fun loadWeatherFromCurrentLocation(
     locationProvider: DeviceLocationProvider,
-    weatherViewModel: WeatherViewModel
+    weatherViewModel: WeatherViewModel,
+    onLocationError: (message: String, canTurnOnGps: Boolean) -> Unit
 ) {
 
     when (val locationResult = locationProvider.getCurrentLocation()) {
+
         is LocationResult.Success -> {
             weatherViewModel.loadWeather(
                 lat = locationResult.location.latitude,
@@ -178,21 +307,68 @@ private suspend fun loadWeatherFromCurrentLocation(
         }
 
         LocationResult.PermissionDenied -> {
-            weatherViewModel.onLocationError("Location permission is required to load local weather")
+            onLocationError("Location permission is required to load local weather", false)
         }
 
         LocationResult.LocationUnavailable -> {
-            weatherViewModel.onLocationError("Unable to get your current location")
+            onLocationError("Turn on GPS to load weather for your current location", true)
         }
 
         is LocationResult.Error -> {
-            weatherViewModel.onLocationError(locationResult.message)
+            onLocationError(locationResult.message, true)
         }
     }
 }
 
 @Composable
-private fun HomeHeader() {
+private fun LocationErrorDialog(
+    message: String,
+    showTurnOnGpsAction: Boolean,
+    onTurnOnGps: () -> Unit,
+    onDismiss: () -> Unit,
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        confirmButton = {
+            Button(
+                onClick = if (showTurnOnGpsAction) onTurnOnGps else onDismiss,
+                colors = ButtonDefaults.buttonColors(containerColor = FreshGreen),
+            ) {
+                Text(text = if (showTurnOnGpsAction) "Turn on GPS" else "OK")
+            }
+        },
+        dismissButton = {
+            Button(
+                onClick = onDismiss,
+                colors = ButtonDefaults.buttonColors(containerColor = FieldGreen),
+            ) {
+                Text(text = "Dismiss")
+            }
+        },
+        title = {
+            Text(
+                text = "Location unavailable",
+                color = DeepGreen,
+                fontWeight = FontWeight.SemiBold,
+            )
+        },
+        text = {
+            Text(
+                text = message,
+                color = FieldGreen,
+                fontSize = 13.sp,
+            )
+        },
+        containerColor = Color.White,
+        shape = RoundedCornerShape(16.dp),
+    )
+}
+
+@Composable
+private fun HomeHeader(
+    isRefreshing: Boolean,
+    onRefresh: () -> Unit,
+) {
     Column(
         modifier = Modifier
             .fillMaxWidth()
@@ -209,7 +385,17 @@ private fun HomeHeader() {
                 fontSize = 22.sp,
                 fontWeight = FontWeight.SemiBold,
             )
-
+            IconButton(
+                onClick = onRefresh,
+                enabled = !isRefreshing,
+            ) {
+                Icon(
+                    imageVector = Icons.Filled.Refresh,
+                    contentDescription = "Refresh weather",
+                    tint = if (isRefreshing) FieldGreen.copy(alpha = 0.48f) else FreshGreen,
+                    modifier = Modifier.size(22.dp),
+                )
+            }
         }
 
         Row(
@@ -235,7 +421,16 @@ private fun HomeHeader() {
 }
 
 @Composable
-private fun WeatherHeroCard() {
+private fun WeatherHeroCard(weather: WeatherUiData?) {
+    val currentWeather = weather?.currentWeather
+    val temperature = currentWeather?.temperature?.toInt()?.let { "$it°" } ?: "--°"
+    val condition = currentWeather?.condition_code?.takeIf { it.isNotBlank() } ?: "Cached weather"
+    val windSpeed = currentWeather?.let { "${it.wind_speed} km/h" } ?: "--"
+    val rainChance = weather?.dailyWeather?.firstOrNull()?.let {
+        "${it.precipitation_probability}%"
+    } ?: "--"
+    val updatedTime = currentWeather?.updatedTimeLabel() ?: "--"
+
     Surface(
         modifier = Modifier
             .fillMaxWidth()
@@ -259,7 +454,7 @@ private fun WeatherHeroCard() {
                         fontWeight = FontWeight.Medium,
                     )
                     Text(
-                        text = "24°",
+                        text = temperature,
                         color = Color.White,
                         fontSize = 54.sp,
                         fontWeight = FontWeight.Medium,
@@ -267,7 +462,7 @@ private fun WeatherHeroCard() {
                         modifier = Modifier.padding(top = 2.dp),
                     )
                     Text(
-                        text = "Partly cloudy",
+                        text = condition,
                         color = Color.White.copy(alpha = 0.84f),
                         fontSize = 14.sp,
                     )
@@ -300,12 +495,28 @@ private fun WeatherHeroCard() {
                     .padding(top = 14.dp),
                 horizontalArrangement = Arrangement.spacedBy(12.dp),
             ) {
-                WeatherStat("Humidity", "72%", Modifier.weight(1f))
-                WeatherStat("Wind", "14 km/h", Modifier.weight(1f))
-                WeatherStat("Rain chance", "30%", Modifier.weight(1f))
+                WeatherStat("Wind", windSpeed, Modifier.weight(1f))
+                WeatherStat("Rain chance", rainChance, Modifier.weight(1f))
+                WeatherStat("Updated", updatedTime, Modifier.weight(1f))
             }
         }
     }
+}
+
+private fun WeatherEntity.updatedTimeLabel(): String {
+    return time.substringAfter("T", missingDelimiterValue = time)
+        .takeIf { it.isNotBlank() }
+        ?: "--"
+}
+
+@Composable
+private fun WeatherErrorText(message: String) {
+    Text(
+        text = message,
+        color = FieldGreen,
+        fontSize = 12.sp,
+        modifier = Modifier.padding(horizontal = 18.dp, vertical = 6.dp),
+    )
 }
 
 @Composable

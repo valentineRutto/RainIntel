@@ -4,11 +4,15 @@ import android.Manifest
 import android.annotation.SuppressLint
 import android.content.Context
 import android.content.pm.PackageManager
+import android.content.IntentSender
 import android.location.Location
 import androidx.core.content.ContextCompat
 import com.google.android.gms.location.FusedLocationProviderClient
+import com.google.android.gms.location.LocationRequest
+import com.google.android.gms.location.LocationSettingsRequest
 import com.google.android.gms.location.LocationServices
 import com.google.android.gms.location.Priority
+import com.google.android.gms.common.api.ResolvableApiException
 import com.google.android.gms.tasks.CancellationTokenSource
 import com.google.android.gms.tasks.Task
 import kotlinx.coroutines.suspendCancellableCoroutine
@@ -26,6 +30,12 @@ sealed interface LocationResult {
     data class Error(val message: String) : LocationResult
 }
 
+sealed interface LocationSettingsResult {
+    data object Enabled : LocationSettingsResult
+    data class ResolutionRequired(val intentSender: IntentSender) : LocationSettingsResult
+    data class Error(val message: String) : LocationSettingsResult
+}
+
 class DeviceLocationProvider(
     context: Context
 ) {
@@ -33,6 +43,8 @@ class DeviceLocationProvider(
 
     private val fusedLocationClient: FusedLocationProviderClient =
         LocationServices.getFusedLocationProviderClient(appContext)
+
+    private val settingsClient = LocationServices.getSettingsClient(appContext)
 
     fun hasLocationPermission(): Boolean {
         return hasPermission(Manifest.permission.ACCESS_FINE_LOCATION) ||
@@ -68,6 +80,19 @@ class DeviceLocationProvider(
         }
     }
 
+    suspend fun getLocationSettingsResult(): LocationSettingsResult {
+        val locationRequest = LocationRequest.Builder(
+            Priority.PRIORITY_BALANCED_POWER_ACCURACY,
+            LOCATION_REQUEST_INTERVAL_MILLIS
+        ).build()
+        val settingsRequest = LocationSettingsRequest.Builder()
+            .addLocationRequest(locationRequest)
+            .setAlwaysShow(true)
+            .build()
+
+        return settingsClient.checkLocationSettings(settingsRequest).awaitSettings()
+    }
+
     @SuppressLint("MissingPermission")
     private suspend fun getFreshLocation(): Location? {
         val cancellationTokenSource = CancellationTokenSource()
@@ -89,6 +114,42 @@ class DeviceLocationProvider(
             latitude = latitude,
             longitude = longitude
         )
+    }
+}
+
+private const val LOCATION_REQUEST_INTERVAL_MILLIS = 10_000L
+
+private suspend fun Task<*>.awaitSettings(): LocationSettingsResult {
+    return suspendCancellableCoroutine { continuation ->
+        addOnSuccessListener {
+            if (continuation.isActive) {
+                continuation.resume(LocationSettingsResult.Enabled)
+            }
+        }
+
+        addOnFailureListener { exception ->
+            if (!continuation.isActive) return@addOnFailureListener
+
+            if (exception is ResolvableApiException) {
+                continuation.resume(
+                    LocationSettingsResult.ResolutionRequired(
+                        intentSender = exception.resolution.intentSender
+                    )
+                )
+            } else {
+                continuation.resume(
+                    LocationSettingsResult.Error(
+                        message = exception.message ?: "Unable to enable location services"
+                    )
+                )
+            }
+        }
+
+        addOnCanceledListener {
+            if (continuation.isActive) {
+                continuation.resume(LocationSettingsResult.Error("Location settings request was cancelled"))
+            }
+        }
     }
 }
 
@@ -120,4 +181,3 @@ private suspend fun Task<Location>.await(
         }
     }
 }
-

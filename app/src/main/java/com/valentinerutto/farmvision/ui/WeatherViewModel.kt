@@ -54,14 +54,6 @@ class WeatherViewModel(private val repository: WeatherRepository) : ViewModel() 
         }
     }
 
-    fun onLocationError(message: String) {
-        _uiState.update {
-            it.copy(
-                isLoading = false,
-                errorMessage = message
-            )
-        }
-    }
 
 }
 
