@@ -34,7 +34,13 @@ import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.outlined.Air
+import androidx.compose.material.icons.outlined.CalendarMonth
+import androidx.compose.material.icons.outlined.Cloud
 import androidx.compose.material.icons.outlined.LocationOn
+import androidx.compose.material.icons.outlined.Minimize
+import androidx.compose.material.icons.outlined.Thunderstorm
+import androidx.compose.material.icons.outlined.WaterDrop
 import androidx.compose.material.icons.outlined.WbSunny
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -108,7 +114,6 @@ fun HomeScreen(
 
     var locationErrorMessage by remember { mutableStateOf<String?>(null) }
     var showTurnOnGpsAction by remember { mutableStateOf(false) }
-    var selectedForecastIndex by remember { mutableIntStateOf(0) }
     var locationName by remember { mutableStateOf("Current location") }
 
     val locationProvider = remember(context) { DeviceLocationProvider(context) }
@@ -189,7 +194,8 @@ fun HomeScreen(
         }
     }
 
-    val forecastDays = uiState.weather.toForecastDays(selectedForecastIndex)
+    val dashboardWeather = uiState.weather.toDashboardWeather()
+    val forecastRows = uiState.weather.toDashboardForecastRows()
 
     Column(
         modifier = modifier
@@ -204,18 +210,15 @@ fun HomeScreen(
             onRefresh = ::refreshWeather
         )
 
-        WeatherHeroCard(weather = uiState.weather)
+        DashboardHero(weather = dashboardWeather)
         uiState.errorMessage?.let { message ->
             WeatherErrorText(message = message)
         }
 
-        SectionTitle("5-day forecast")
-        ForecastRow(
-            days = forecastDays,
-            onForecastClick = { index -> selectedForecastIndex = index }
-        )
+        TodayDetailsCard(weather = dashboardWeather)
+        SevenDayForecastCard(days = forecastRows)
 
-        Spacer(modifier = Modifier.height(20.dp))
+        Spacer(modifier = Modifier.height(28.dp))
     }
 
     locationErrorMessage?.let { message ->
@@ -249,6 +252,341 @@ private fun WeatherUiData?.toForecastDays(selectedIndex: Int): List<ForecastDay>
             temperature = "${daily.temp_max.toInt()}°",
             markerColor = daily.condition_code.toWeatherMarkerColor(),
             selected = index == selectedIndex
+        )
+    }
+}
+
+private data class DashboardWeather(
+    val temperature: String,
+    val condition: String,
+    val highTemp: String,
+    val lowTemp: String,
+    val humidity: String,
+    val windSpeed: String,
+    val uvIndex: String,
+    val icon: ImageVector,
+)
+
+private data class DashboardForecastRow(
+    val day: String,
+    val icon: ImageVector,
+    val rainChance: String,
+    val highTemp: String,
+    val lowTemp: String,
+    val iconTint: Color,
+)
+
+private fun WeatherUiData?.toDashboardWeather(): DashboardWeather {
+    val current = this?.currentWeather
+    val today = this?.dailyWeather.orEmpty().firstOrNull()
+    val condition = current?.condition_code?.toDisplayCondition() ?: "Partly Cloudy"
+
+    return DashboardWeather(
+        temperature = current?.temperature?.toInt()?.let { "$it°" } ?: "--°",
+        condition = condition,
+        highTemp = today?.temp_max?.toInt()?.let { "H: $it°" } ?: "H: --°",
+        lowTemp = today?.temp_min?.toInt()?.let { "L: $it°" } ?: "L: --°",
+        humidity = today?.precipitation_probability?.let { "$it%" } ?: "--",
+        windSpeed = current?.wind_speed?.toInt()?.let { "$it mph" } ?: "--",
+        uvIndex = "4",
+        icon = condition.toWeatherIcon()
+    )
+}
+
+private fun WeatherUiData?.toDashboardForecastRows(): List<DashboardForecastRow> {
+    val daily = this?.dailyWeather.orEmpty()
+
+    if (daily.isEmpty()) {
+        return listOf(
+            DashboardForecastRow("Today", icon = Icons.Outlined.Minimize, "--", "--", "--", DeepGreen),
+      )
+    }
+
+    return daily.take(7).mapIndexed { index, day ->
+        val condition = day.condition_code.toDisplayCondition()
+        DashboardForecastRow(
+            day = if (index == 0) "Today" else day.dayOfTheWeek,
+            icon = condition.toWeatherIcon(),
+            rainChance = "${day.precipitation_probability}%",
+            highTemp = "${day.temp_max.toInt()}°",
+            lowTemp = "${day.temp_min.toInt()}°",
+            iconTint = day.condition_code.toWeatherMarkerColor()
+        )
+    }
+}
+
+private fun String.toDisplayCondition(): String {
+    if (isBlank()) return "Partly Cloudy"
+
+    return lowercase()
+        .replace('_', ' ')
+        .split(" ")
+        .filter { it.isNotBlank() }
+        .joinToString(" ") { word ->
+            word.replaceFirstChar { char -> char.uppercase() }
+        }
+}
+
+private fun String.toWeatherIcon(): ImageVector {
+    val condition = lowercase()
+    return when {
+        "rain" in condition || "shower" in condition || "storm" in condition -> Icons.Outlined.Thunderstorm
+        "cloud" in condition || "overcast" in condition -> Icons.Outlined.Cloud
+        else -> Icons.Outlined.WbSunny
+    }
+}
+
+@Composable
+private fun DashboardHero(
+    weather: DashboardWeather,
+    modifier: Modifier = Modifier,
+) {
+    Column(
+        modifier = modifier
+            .fillMaxWidth()
+            .background(RainBlue.copy(alpha = 0.16f))
+            .padding(horizontal = 22.dp, vertical = 54.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+    ) {
+        Icon(
+            imageVector = weather.icon,
+            contentDescription = null,
+            tint = DeepGreen,
+            modifier = Modifier.size(92.dp),
+        )
+        Text(
+            text = weather.temperature,
+            color = FieldGreen,
+            fontSize = 72.sp,
+            fontWeight = FontWeight.Light,
+            lineHeight = 78.sp,
+            modifier = Modifier.padding(top = 34.dp),
+        )
+        Text(
+            text = weather.condition,
+            color = FreshGreen,
+            fontSize = 30.sp,
+            fontWeight = FontWeight.SemiBold,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+        )
+        Row(
+            modifier = Modifier.padding(top = 18.dp),
+            horizontalArrangement = Arrangement.spacedBy(18.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(
+                text = weather.highTemp,
+                color = FieldGreen.copy(alpha = 0.82f),
+                fontSize = 20.sp,
+                fontWeight = FontWeight.Medium,
+            )
+            Text(
+                text = weather.lowTemp,
+                color = FieldGreen.copy(alpha = 0.82f),
+                fontSize = 20.sp,
+                fontWeight = FontWeight.Medium,
+            )
+        }
+    }
+}
+
+@Composable
+private fun TodayDetailsCard(
+    weather: DashboardWeather,
+    modifier: Modifier = Modifier,
+) {
+    Surface(
+        modifier = modifier
+            .fillMaxWidth()
+            .padding(horizontal = 22.dp, vertical = 22.dp),
+        shape = RoundedCornerShape(16.dp),
+        color = Color.White.copy(alpha = 0.88f),
+    ) {
+        Column(modifier = Modifier.padding(horizontal = 24.dp, vertical = 26.dp)) {
+            Text(
+                text = "TODAY'S DETAILS",
+                color = FieldGreen,
+                fontSize = 22.sp,
+                letterSpacing = 0.sp,
+            )
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = 26.dp),
+                horizontalArrangement = Arrangement.spacedBy(16.dp),
+            ) {
+                DetailTile(
+                    label = "Humidity",
+                    value = weather.humidity,
+                    icon = Icons.Outlined.WaterDrop,
+                    modifier = Modifier.weight(1f),
+                )
+                DetailTile(
+                    label = "Wind",
+                    value = weather.windSpeed,
+                    icon = Icons.Outlined.Air,
+                    modifier = Modifier.weight(1f),
+                )
+                DetailTile(
+                    label = "UV Index",
+                    value = weather.uvIndex,
+                    icon = Icons.Outlined.WbSunny,
+                    modifier = Modifier.weight(1f),
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun DetailTile(
+    label: String,
+    value: String,
+    icon: ImageVector,
+    modifier: Modifier = Modifier,
+) {
+    Surface(
+        modifier = modifier.height(140.dp),
+        shape = RoundedCornerShape(10.dp),
+        color = ForecastBorder.copy(alpha = 0.56f),
+    ) {
+        Column(
+            modifier = Modifier.padding(horizontal = 8.dp, vertical = 16.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.SpaceBetween,
+        ) {
+            Icon(
+                imageVector = icon,
+                contentDescription = null,
+                tint = FreshGreen,
+                modifier = Modifier.size(28.dp),
+            )
+            Text(
+                text = label,
+                color = FieldGreen.copy(alpha = 0.74f),
+                fontSize = 12.sp,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+            Text(
+                text = value,
+                color = FieldGreen,
+                fontSize = 24.sp,
+                fontWeight = FontWeight.Bold,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+        }
+    }
+}
+
+@Composable
+private fun SevenDayForecastCard(
+    days: List<DashboardForecastRow>,
+    modifier: Modifier = Modifier,
+) {
+    Surface(
+        modifier = modifier
+            .fillMaxWidth()
+            .padding(horizontal = 22.dp, vertical = 20.dp),
+        shape = RoundedCornerShape(16.dp),
+        color = Color.White.copy(alpha = 0.88f),
+    ) {
+        Column(modifier = Modifier.padding(horizontal = 24.dp, vertical = 26.dp)) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(
+                    text = "7-DAY FORECAST",
+                    color = FieldGreen,
+                    fontSize = 22.sp,
+                    letterSpacing = 0.sp,
+                )
+                Icon(
+                    imageVector = Icons.Outlined.CalendarMonth,
+                    contentDescription = null,
+                    tint = FieldGreen,
+                    modifier = Modifier.size(20.dp),
+                )
+            }
+
+            Spacer(modifier = Modifier.height(24.dp))
+
+            days.forEachIndexed { index, day ->
+                ForecastListRow(day = day)
+                if (index != days.lastIndex) {
+                    HorizontalDivider(
+                        modifier = Modifier.padding(vertical = 12.dp),
+                        color = ForecastBorder,
+                        thickness = 1.dp,
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun ForecastListRow(
+    day: DashboardForecastRow,
+    modifier: Modifier = Modifier,
+) {
+    Row(
+        modifier = modifier
+            .fillMaxWidth()
+            .height(40.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(
+            text = day.day,
+            color = FieldGreen,
+            fontSize = 22.sp,
+            fontWeight = FontWeight.SemiBold,
+            modifier = Modifier.width(112.dp),
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+        )
+        Icon(
+            imageVector = day.icon,
+            contentDescription = null,
+            tint = day.iconTint,
+            modifier = Modifier.size(30.dp),
+        )
+        Row(
+            modifier = Modifier
+                .weight(1f)
+                .padding(start = 22.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(6.dp),
+        ) {
+            Icon(
+                imageVector = Icons.Outlined.WaterDrop,
+                contentDescription = null,
+                tint = FreshGreen,
+                modifier = Modifier.size(16.dp),
+            )
+            Text(
+                text = day.rainChance,
+                color = FreshGreen,
+                fontSize = 14.sp,
+                maxLines = 1,
+            )
+        }
+        Text(
+            text = day.highTemp,
+            color = FieldGreen,
+            fontSize = 22.sp,
+            fontWeight = FontWeight.Bold,
+            modifier = Modifier.width(48.dp),
+        )
+        Text(
+            text = day.lowTemp,
+            color = FieldGreen.copy(alpha = 0.82f),
+            fontSize = 22.sp,
+            modifier = Modifier.width(48.dp),
         )
     }
 }
