@@ -61,6 +61,8 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.valentinerutto.rainintel.ui.WeatherViewModel
 import com.valentinerutto.rainintel.ui.theme.BottomNavContentInactive
 import com.valentinerutto.rainintel.ui.theme.BottomNavIndicatorInactive
 import com.valentinerutto.rainintel.ui.theme.BottomNavLabelInactive
@@ -73,6 +75,7 @@ import com.valentinerutto.rainintel.ui.theme.Mint
 import com.valentinerutto.rainintel.ui.theme.RainBlue
 import com.valentinerutto.rainintel.ui.theme.RainIntelTheme
 import com.valentinerutto.rainintel.ui.theme.ScreenBackground
+import org.koin.compose.viewmodel.koinViewModel
 
 private data class RecentCity(
     val name: String,
@@ -96,9 +99,13 @@ private data class HourlyForecast(
 
 @Composable
 fun SearchScreen(
-    modifier: Modifier = Modifier,
+    modifier: Modifier = Modifier,    viewModel: WeatherViewModel = koinViewModel()
+
 ) {
+
     var searchQuery by remember { mutableStateOf("") }
+
+    val state by viewModel.uiSearchState.collectAsStateWithLifecycle()
 
     val recentCities = listOf(
         RecentCity("Paris", "62°", saved = true),
@@ -106,10 +113,12 @@ fun SearchScreen(
         RecentCity("New York", "55°", saved = false),
         RecentCity("Berlin", "48°", saved = false),
     )
+
     val savedCities = listOf(
         SavedCity("Paris", "France", "62°", "Partly Cloudy"),
         SavedCity("Tokyo", "Japan", "74°", "Sunny"),
     )
+
     val hourlyForecast = listOf(
         HourlyForecast("Now", "58°", Icons.Outlined.Cloud),
         HourlyForecast("3 PM", "56°", Icons.Outlined.Thunderstorm, selected = true),
@@ -133,7 +142,7 @@ fun SearchScreen(
         ) {
             SearchInput(
                 query = searchQuery,
-                onQueryChange = { searchQuery = it },
+                onQueryChange = { viewModel.setSearchQuery(it)},
             )
 
             SectionHeader(

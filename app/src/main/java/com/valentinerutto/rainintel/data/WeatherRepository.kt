@@ -1,8 +1,12 @@
 package com.valentinerutto.rainintel.data
 
+import com.valentinerutto.rainintel.data.local.CityDao
+import com.valentinerutto.rainintel.data.local.CityEntity
+import com.valentinerutto.rainintel.data.local.PreloadedCityEntity
 import com.valentinerutto.rainintel.data.local.WeatherDao
 import com.valentinerutto.rainintel.data.local.WeatherEntity
 import com.valentinerutto.rainintel.data.local.mapToDailyWeatherEntity
+import com.valentinerutto.rainintel.data.local.toCityEntity
 import com.valentinerutto.rainintel.data.local.toWeatherEntity
 import com.valentinerutto.rainintel.data.models.WeatherUiData
 import com.valentinerutto.rainintel.data.network.ApiService
@@ -14,7 +18,8 @@ import java.util.Locale
 
 class WeatherRepository(
     private val apiService: ApiService,
-    private val weatherDao: WeatherDao
+    private val weatherDao: WeatherDao,
+    private val cityDao: CityDao
 ) {
 
     fun observeWeather(): Flow<WeatherUiData?> {
@@ -32,6 +37,7 @@ class WeatherRepository(
     }
 
     suspend fun getWeather(lat: Double, lon: Double) {
+
         val currentWeather = weatherDao.getCurrentLatest()
         val dailyWeather = weatherDao.getDaily()
 
@@ -42,18 +48,30 @@ class WeatherRepository(
         refreshWeather(lat, lon)
     }
 
-    suspend fun getWeatherByCity(city: String): WeatherUiData {
+    suspend fun getWeatherByCity(city: PreloadedCityEntity): CityEntity {
+        val weatherResponse = apiService.getWeatherByCity(city.city)
 
-        val weatherResponse = apiService.getWeatherByCity(city)
+      val selectedCity = weatherResponse.toCityEntity(city)
+     cityDao .insertCityWeather(selectedCity)
+    return selectedCity
 
-return weatherResponse.let {
-    WeatherUiData(
-        currentWeather = it.toWeatherEntity(),
-        dailyWeather = mapToDailyWeatherEntity(it)
-    )
-}
+        }
 
+    suspend fun addToRecentSearches(cityName: String) {
+        val timestamp = System.currentTimeMillis()
+        cityDao.updateRecentStatus(cityName, 1, timestamp)
     }
+
+    suspend fun clearRecentSearches() {
+        cityDao.clearRecentSearches()
+    }
+    suspend fun removeFromRecentSearches(cityName: String) {
+        cityDao.updateRecentStatus(cityName, 0, 0L)
+    }
+
+fun observeRecentWeather(): Flow<List<CityEntity>> {
+    return cityDao.observeRecentCityWeather()
+}
 
 
     suspend fun refreshWeather(lat: Double, lon: Double) {

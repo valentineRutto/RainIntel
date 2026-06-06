@@ -22,7 +22,7 @@ interface CityDao {
         LIMIT :limit
         """
     )
-    suspend fun search(query: String, limit: Int = 50): List<PreloadedCityEntity>
+    suspend fun search(query: String, limit: Int = 20): List<PreloadedCityEntity>
 
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
@@ -40,6 +40,9 @@ interface CityDao {
     @Query("UPDATE cities_weather SET isRecent = :isRecent, recentSearchTimestamp = :timestamp WHERE city = :cityName")
     suspend fun updateRecentStatus(cityName: String, isRecent: Int, timestamp: Long)
 
+
+    @Query("SELECT * FROM cities_weather ORDER BY recentSearchTimestamp DESC")
+    fun observeRecentCityWeather(): Flow<List<CityEntity>>
     @Query("UPDATE cities_weather SET isRecent = 0")
     suspend fun clearRecentSearches()
 }
