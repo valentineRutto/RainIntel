@@ -102,14 +102,8 @@ fun SearchScreen(
 
     val state by viewModel.uiSearchState.collectAsStateWithLifecycle()
     var isSavedCitiesEditMode by remember { mutableStateOf(false) }
+    val currentCityWeather = state.selectedCityWeather ?: state.savedCityWeather.firstOrNull()
 
-
-    val hourlyForecast = listOf(
-        HourlyForecast("Now", "58°", Icons.Outlined.Cloud),
-        HourlyForecast("3 PM", "56°", Icons.Outlined.Thunderstorm, selected = true),
-        HourlyForecast("4 PM", "55°", Icons.Outlined.Thunderstorm),
-        HourlyForecast("5 PM", "54°", Icons.Outlined.Cloud),
-    )
 
     Column(
         modifier = modifier
@@ -118,7 +112,7 @@ fun SearchScreen(
             .windowInsetsPadding(WindowInsets.statusBars)
             .verticalScroll(rememberScrollState()),
     ) {
-        SearchHeader(locationName = "London")
+
         HorizontalDivider(color = ForecastBorder)
 
         Column(
@@ -148,7 +142,7 @@ fun SearchScreen(
             }
 
             SavedCitiesSection(
-                savedCities = state.recentWeather,
+                savedCities = state.savedCityWeather,
                 isEditMode = isSavedCitiesEditMode,
                 onEditModeToggle = { isSavedCitiesEditMode = !isSavedCitiesEditMode },
                 onCityClick = viewModel::selectCityWeather,
@@ -156,56 +150,17 @@ fun SearchScreen(
                 onToggleSaved = viewModel::toggleSavedCity,
             )
 
-            CurrentWeatherCard(cityWeather = state.selectedCityWeather)
-
-            SectionHeader(title = "HOURLY FORECAST")
-            HourlyForecastRow(forecast = hourlyForecast)
+            CurrentWeatherCard(
+                cityWeather = currentCityWeather,
+                onToggleSaved = viewModel::toggleSavedCity,
+            )
 
             Spacer(modifier = Modifier.height(20.dp))
         }
     }
 }
 
-@Composable
-private fun SearchHeader(
-    locationName: String,
-    modifier: Modifier = Modifier,
-) {
-    Row(
-        modifier = modifier
-            .fillMaxWidth()
-            .padding(horizontal = 24.dp, vertical = 18.dp),
-        horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Row(
-            horizontalArrangement = Arrangement.spacedBy(10.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Icon(
-                imageVector = Icons.Outlined.LocationOn,
-                contentDescription = null,
-                tint = FreshGreen,
-                modifier = Modifier.size(26.dp),
-            )
-            Text(
-                text = locationName,
-                color = FieldGreen,
-                fontSize = 28.sp,
-                fontWeight = FontWeight.SemiBold,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
-        }
 
-        Icon(
-            imageVector = Icons.Outlined.AccountCircle,
-            contentDescription = "Profile",
-            tint = FieldGreen,
-            modifier = Modifier.size(28.dp),
-        )
-    }
-}
 
 @Composable
 private fun SearchInput(
@@ -513,6 +468,7 @@ private fun SavedCityRow(
 @Composable
 private fun CurrentWeatherCard(
     cityWeather: CityEntity?,
+    onToggleSaved: (CityEntity) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val cityName = cityWeather?.city ?: "Select a city"
@@ -523,7 +479,7 @@ private fun CurrentWeatherCard(
     Surface(
         modifier = modifier
             .fillMaxWidth()
-            .height(338.dp),
+            .height(250.dp),
         shape = RoundedCornerShape(20.dp),
         shadowElevation = 4.dp,
     ) {
@@ -585,6 +541,22 @@ private fun CurrentWeatherCard(
                 }
             }
 
+            if (cityWeather != null) {
+                IconButton(
+                    onClick = { onToggleSaved(cityWeather) },
+                    modifier = Modifier
+                        .align(Alignment.BottomStart)
+                        .padding(start = 18.dp, bottom = 18.dp),
+                ) {
+                    Icon(
+                        imageVector = if (cityWeather.isSaved) Icons.Outlined.Star else Icons.Outlined.StarBorder,
+                        contentDescription = if (cityWeather.isSaved) "Remove saved city" else "Save city",
+                        tint = FreshGreen,
+                        modifier = Modifier.size(30.dp),
+                    )
+                }
+            }
+
             Column(
                 modifier = Modifier
                     .align(Alignment.TopEnd)
@@ -606,114 +578,10 @@ private fun CurrentWeatherCard(
                 )
             }
 
-            RainfallRiskCard(
-                modifier = Modifier
-                    .align(Alignment.BottomCenter)
-                    .padding(24.dp),
-            )
         }
     }
 }
 
-@Composable
-private fun RainfallRiskCard(
-    modifier: Modifier = Modifier,
-) {
-    Surface(
-        modifier = modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(16.dp),
-        color = Color(0xFFE8F4FF),
-        border = BorderStroke(1.dp, RainBlue),
-    ) {
-        Row(
-            modifier = Modifier.padding(20.dp),
-            horizontalArrangement = Arrangement.spacedBy(16.dp),
-            verticalAlignment = Alignment.Top,
-        ) {
-            Icon(
-                imageVector = Icons.Outlined.Thunderstorm,
-                contentDescription = null,
-                tint = DeepGreen,
-                modifier = Modifier.size(30.dp),
-            )
-            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                Text(
-                    text = "RAINFALL RISK",
-                    color = DeepGreen,
-                    fontSize = 12.sp,
-                    fontFamily = FontFamily.Monospace,
-                    fontWeight = FontWeight.Bold,
-                    letterSpacing = 0.sp,
-                )
-                Text(
-                    text = "High Risk of Rainfall: Heavy showers expected at 3 PM",
-                    color = FieldGreen,
-                    fontSize = 18.sp,
-                    lineHeight = 26.sp,
-                    fontWeight = FontWeight.SemiBold,
-                )
-            }
-        }
-    }
-}
-
-@Composable
-private fun HourlyForecastRow(
-    forecast: List<HourlyForecast>,
-    modifier: Modifier = Modifier,
-) {
-    Row(
-        modifier = modifier
-            .fillMaxWidth()
-            .horizontalScroll(rememberScrollState()),
-        horizontalArrangement = Arrangement.spacedBy(12.dp),
-    ) {
-        forecast.forEach { item ->
-            HourlyForecastCard(forecast = item)
-        }
-    }
-}
-
-@Composable
-private fun HourlyForecastCard(
-    forecast: HourlyForecast,
-    modifier: Modifier = Modifier,
-) {
-    Surface(
-        modifier = modifier
-            .width(102.dp)
-            .height(146.dp),
-        shape = RoundedCornerShape(16.dp),
-        color = Color.White,
-        border = if (forecast.selected) BorderStroke(2.dp, RainBlue) else null,
-    ) {
-        Column(
-            modifier = Modifier.padding(vertical = 18.dp),
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.SpaceBetween,
-        ) {
-            Text(
-                text = forecast.label,
-                color = FieldGreen,
-                fontSize = 16.sp,
-                fontWeight = if (forecast.selected) FontWeight.Bold else FontWeight.Normal,
-                maxLines = 1,
-            )
-            Icon(
-                imageVector = forecast.icon,
-                contentDescription = null,
-                tint = FreshGreen,
-                modifier = Modifier.size(30.dp),
-            )
-            Text(
-                text = forecast.temperature,
-                color = FieldGreen,
-                fontSize = 22.sp,
-                fontWeight = if (forecast.selected) FontWeight.Bold else FontWeight.Normal,
-            )
-        }
-    }
-}
 
 @Preview(showBackground = true, widthDp = 320)
 @Composable

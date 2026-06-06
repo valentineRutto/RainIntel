@@ -46,7 +46,7 @@ class CitySeeder(
 
     private fun Map<String, String>.toPreloadedCityEntity(): PreloadedCityEntity? {
         val id = this["id"]?.toLongOrNull() ?: return null
-        val city = this["city"]?.takeIf { it.isNotBlank() } ?: return null
+        val city = this["city_ascii"]?.takeIf { it.isNotBlank() } ?: return null
         val lat = this["lat"]?.toDoubleOrNull() ?: return null
         val lng = this["lng"]?.toDoubleOrNull() ?: return null
         val country = this["country"]?.takeIf { it.isNotBlank() } ?: return null

@@ -34,7 +34,7 @@ interface CityDao {
     @Query("SELECT * FROM cities_weather WHERE id = :cityId LIMIT 1")
     suspend fun getCityWeatherById(cityId: Long): CityEntity?
 
-    @Query("SELECT * FROM cities_weather WHERE isSaved = 1 ORDER BY city ASC")
+    @Query("SELECT * FROM cities_weather WHERE isSaved = 1 ORDER BY recentSearchTimestamp DESC, city ASC")
     fun getSavedCities(): Flow<List<CityEntity>>
 
     @Query("UPDATE cities_weather SET isSaved = :isSaved WHERE city = :cityName")

@@ -214,6 +214,22 @@ class WeatherViewModel(private val repository: WeatherRepository) : ViewModel() 
     fun toggleSavedCity(city: CityEntity) {
         viewModelScope.launch {
             repository.toggleSavedCity(city)
+            _uiSearchState.update { state ->
+                val updatedCity = city.copy(isSaved = !city.isSaved)
+                state.copy(
+                    selectedCityWeather = state.selectedCityWeather?.let { selectedCity ->
+                        if (selectedCity.id == city.id) updatedCity else selectedCity
+                    },
+                    recentWeather = state.recentWeather.map { recentCity ->
+                        if (recentCity.id == city.id) updatedCity else recentCity
+                    },
+                    savedCityWeather = if (city.isSaved) {
+                        state.savedCityWeather.filterNot { savedCity -> savedCity.id == city.id }
+                    } else {
+                        listOf(updatedCity) + state.savedCityWeather.filterNot { savedCity -> savedCity.id == city.id }
+                    }
+                )
+            }
         }
     }
 

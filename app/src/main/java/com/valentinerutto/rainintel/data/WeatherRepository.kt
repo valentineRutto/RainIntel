@@ -38,6 +38,7 @@ class WeatherRepository(
     }
 
     suspend fun getWeather(lat: Double, lon: Double) {
+
         val currentWeather = weatherDao.getCurrentLatest()
         val dailyWeather = weatherDao.getDaily()
 
