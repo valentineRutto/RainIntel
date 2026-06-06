@@ -1,5 +1,5 @@
 <resources>
-    <string name="app_name">FarmVision</string>
+    <string name="app_name">RainIntel</string>
     <string name="turn_on_gps_to_load_weather_for_your_current_location">Turn on GPS to load weather for your current location</string>
     <string name="location_permission_is_required_to_load_local_weather">Location permission is required to load local weather</string>
 </resources>

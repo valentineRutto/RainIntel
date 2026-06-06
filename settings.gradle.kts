@@ -22,5 +22,5 @@ dependencyResolutionManagement {
     }
 }
 
-rootProject.name = "FarmVision"
+rootProject.name = "RainIntel"
 include(":app")

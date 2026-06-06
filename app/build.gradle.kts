@@ -10,7 +10,7 @@ plugins {
 }
 
 android {
-    namespace = "com.valentinerutto.farmvision"
+    namespace = "com.valentinerutto.rainintel"
 
     compileSdk {
         version = release(36) {
@@ -23,7 +23,7 @@ android {
         }
     }
     defaultConfig {
-        applicationId = "com.valentinerutto.farmvision"
+        applicationId = "com.valentinerutto.rainintel"
         minSdk = 24
         targetSdk = 36
         versionCode = 1
