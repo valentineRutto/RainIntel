@@ -96,6 +96,8 @@ import com.valentinerutto.rainintel.util.location.DeviceLocationProvider
 import com.valentinerutto.rainintel.util.location.LocationNameResult
 import com.valentinerutto.rainintel.util.location.LocationSettingsResult
 import com.valentinerutto.rainintel.util.location.LocationResult
+import com.valentinerutto.rainintel.util.toDisplayCondition
+import com.valentinerutto.rainintel.util.toWeatherIcon
 import com.valentinerutto.rainintel.util.toWeatherMarkerColor
 import com.valentinerutto.rainintel.util.updatedTimeLabel
 import com.valentinerutto.rainintel.util.withSelectedIndex
@@ -318,7 +320,7 @@ private fun WeatherUiData?.toDashboardForecastRows(): List<DashboardForecastRow>
       )
     }
 
-    return daily.take(7).mapIndexed { index, day ->
+    return daily.take(5).mapIndexed { index, day ->
         val condition = day.condition_code.toDisplayCondition()
         DashboardForecastRow(
             day = if (index == 0) "Today" else day.dayOfTheWeek,
@@ -331,26 +333,7 @@ private fun WeatherUiData?.toDashboardForecastRows(): List<DashboardForecastRow>
     }
 }
 
-private fun String.toDisplayCondition(): String {
-    if (isBlank()) return "Partly Cloudy"
 
-    return lowercase()
-        .replace('_', ' ')
-        .split(" ")
-        .filter { it.isNotBlank() }
-        .joinToString(" ") { word ->
-            word.replaceFirstChar { char -> char.uppercase() }
-        }
-}
-
-private fun String.toWeatherIcon(): ImageVector {
-    val condition = lowercase()
-    return when {
-        "rain" in condition || "shower" in condition || "storm" in condition -> Icons.Outlined.Thunderstorm
-        "cloud" in condition || "overcast" in condition -> Icons.Outlined.Cloud
-        else -> Icons.Outlined.WbSunny
-    }
-}
 
 @Composable
 private fun DashboardHero(

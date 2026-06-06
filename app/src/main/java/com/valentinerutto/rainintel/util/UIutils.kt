@@ -1,11 +1,17 @@
 package com.valentinerutto.rainintel.util
 
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.Cloud
+import androidx.compose.material.icons.outlined.Thunderstorm
+import androidx.compose.material.icons.outlined.WbSunny
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
 import com.valentinerutto.rainintel.data.local.WeatherEntity
 import com.valentinerutto.rainintel.data.models.ForecastDay
 import com.valentinerutto.rainintel.ui.theme.Mint
 import com.valentinerutto.rainintel.ui.theme.RainBlue
 import com.valentinerutto.rainintel.ui.theme.SunYellow
+import java.time.LocalDate
 import java.util.Locale
 import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
@@ -20,6 +26,11 @@ private const val FALLBACK = "--"
 
 private val apiFormatter = DateTimeFormatter.ofPattern(
     API_DATE_TIME_PATTERN,
+    Locale.US
+)
+
+private val apiDateFormatter = DateTimeFormatter.ofPattern(
+    API_DATE_PATTERN,
     Locale.US
 )
 
@@ -43,6 +54,17 @@ private fun String.toLocalDateTimeOrNull(): LocalDateTime? {
     }
 }
 
+private fun String.toLocalDateOrNull(): LocalDate? {
+    if (isBlank()) return null
+
+    return toLocalDateTimeOrNull()?.toLocalDate()
+        ?: try {
+            LocalDate.parse(this, apiDateFormatter)
+        } catch (_: Exception) {
+            null
+        }
+}
+
 fun String.toDisplayDateTime(): String {
     val dateTime = toLocalDateTimeOrNull()
         ?: return FALLBACK
@@ -51,10 +73,10 @@ fun String.toDisplayDateTime(): String {
 }
 
 fun String.toDayOfWeek(): String {
-    val dateTime = toLocalDateTimeOrNull()
+    val date = toLocalDateOrNull()
         ?: return FALLBACK
 
-    return dateTime.format(dayOfWeekFormatter)
+    return date.format(dayOfWeekFormatter)
 }
 
 private fun String.toDayLabel(): String {
@@ -68,6 +90,16 @@ private fun String.toDayLabel(): String {
     }
 }
 
+
+
+ fun String.toWeatherIcon(): ImageVector {
+    val condition = lowercase()
+    return when {
+        "rain" in condition || "shower" in condition || "storm" in condition -> Icons.Outlined.Thunderstorm
+        "cloud" in condition || "overcast" in condition -> Icons.Outlined.Cloud
+        else -> Icons.Outlined.WbSunny
+    }
+}
 fun String.toDisplayCondition(): String {
     if (isBlank()) return "Weather unavailable"
 
@@ -89,6 +121,7 @@ fun String.toDisplayCondition(): String {
     }
 }
 private const val API_DATE_TIME_PATTERN = "yyyy-MM-dd'T'HH:mm"
+private const val API_DATE_PATTERN = "yyyy-MM-dd"
 private const val DISPLAY_DATE_TIME_PATTERN ="yyyy-MM-dd\nHH:mm"
 
 private const val DISPLAY_DAY_OF_WEEK_PATTERN = "EEE"
