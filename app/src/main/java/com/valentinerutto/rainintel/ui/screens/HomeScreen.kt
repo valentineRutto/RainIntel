@@ -67,6 +67,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
@@ -119,6 +120,11 @@ fun HomeScreen(
     val coroutineScope = rememberCoroutineScope()
     val uiState by weatherViewModel.uiState.collectAsState()
 
+    val locationPermissionRequiredMessage =
+        stringResource(R.string.location_permission_is_required_to_load_local_weather)
+    val turnOnGpsMessage =
+        stringResource(R.string.turn_on_gps_to_load_weather_for_your_current_location)
+
     var locationErrorMessage by remember { mutableStateOf<String?>(null) }
     var showTurnOnGpsAction by remember { mutableStateOf(false) }
     var locationName by remember { mutableStateOf("Current location") }
@@ -164,7 +170,7 @@ fun HomeScreen(
             }
         } else {
             showLocationError(
-                message = context.getString(R.string.turn_on_gps_to_load_weather_for_your_current_location),
+                message = turnOnGpsMessage,
                 canTurnOnGps = true
             )
         }
@@ -198,7 +204,7 @@ fun HomeScreen(
 
     fun refreshWeather() {
         if (!locationProvider.hasLocationPermission()) {
-            showLocationError(context.getString(R.string.location_permission_is_required_to_load_local_weather))
+            showLocationError(locationPermissionRequiredMessage)
             return
         }
 
