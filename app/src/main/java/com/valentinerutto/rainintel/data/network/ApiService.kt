@@ -9,7 +9,7 @@ interface ApiService {
     @GET("weather")
     suspend fun getWeather( @Query("lat") lat: Double,
                                         @Query("lon") lon: Double,
-                                        @Query("days") days: Int = 5,
+                                        @Query("days") days: Int = 7,
                                         @Query("ai") ai: Boolean = true,
                                         @Query("units") units: String = "metric",
                                         @Query("lang") lang: String = "en"): WeatherResponse
