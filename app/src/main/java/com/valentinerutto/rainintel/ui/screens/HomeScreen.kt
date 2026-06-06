@@ -48,6 +48,7 @@ import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -222,11 +223,16 @@ fun HomeScreen(
             .windowInsetsPadding(WindowInsets.statusBars)
             .verticalScroll(rememberScrollState()),
     ) {
+
         HomeHeader(
             locationName = locationName,
             isRefreshing = uiState.isLoading,
             onRefresh = ::refreshWeather
         )
+
+        if (uiState.isLoading) {
+            HomeLoadingIndicator()
+        }
 
         DashboardHero(weather = dashboardWeather)
         uiState.errorMessage?.let { message ->
@@ -247,6 +253,19 @@ fun HomeScreen(
             onDismiss = ::clearLocationError
         )
     }
+}
+
+@Composable
+private fun HomeLoadingIndicator(
+    modifier: Modifier = Modifier,
+) {
+    LinearProgressIndicator(
+        modifier = modifier
+            .fillMaxWidth()
+            .height(3.dp),
+        color = FreshGreen,
+        trackColor = ForecastBorder,
+    )
 }
 
 

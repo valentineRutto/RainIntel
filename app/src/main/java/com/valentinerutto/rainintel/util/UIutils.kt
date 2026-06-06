@@ -90,7 +90,15 @@ private fun String.toDayLabel(): String {
     }
 }
 
-
+fun getUvRiskLevel(uv: Double): String {
+    return when {
+        uv >= 11 -> "Extreme"
+        uv >= 8 -> "Very High"
+        uv >= 6 -> "High"
+        uv >= 3 -> "Moderate"
+        else -> "Low"
+    }
+}
 
  fun String.toWeatherIcon(): ImageVector {
     val condition = lowercase()
