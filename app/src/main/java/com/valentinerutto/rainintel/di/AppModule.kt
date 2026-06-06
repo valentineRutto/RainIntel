@@ -1,5 +1,6 @@
 package com.valentinerutto.rainintel.di
 
+import androidx.work.WorkManager
 import com.valentinerutto.rainintel.MyApplication
 import com.valentinerutto.rainintel.data.WeatherRepository
 import com.valentinerutto.rainintel.data.local.CitySeeder
@@ -7,15 +8,24 @@ import com.valentinerutto.rainintel.data.local.RainIntelDatabase
 import com.valentinerutto.rainintel.data.network.ApiService
 import com.valentinerutto.rainintel.ui.WeatherViewModel
 import com.valentinerutto.rainintel.util.RetrofitClient
+import com.valentinerutto.rainintel.util.WeatherNotificationHelper
+import com.valentinerutto.rainintel.util.location.DeviceLocationProvider
+import com.valentinerutto.rainintel.worker.RainIntelWorkerFactory
+import com.valentinerutto.rainintel.worker.WeatherAlertWorkScheduler
 import org.koin.core.module.dsl.viewModel
 import org.koin.dsl.module
 import retrofit2.Retrofit
 
- val appModule = module {
-    single { MyApplication.INSTANCE }
-   single { WeatherRepository(get(), cityDao = get(), weatherDao = get()) }
-     viewModel { WeatherViewModel(get()) }
- }
+	 val appModule = module {
+	    single { MyApplication.INSTANCE }
+	    single { DeviceLocationProvider(get<MyApplication>()) }
+	    single { WeatherNotificationHelper(get<MyApplication>()) }
+	    single { WorkManager.getInstance(get<MyApplication>()) }
+	    single { RainIntelWorkerFactory(get(), get(), get()) }
+	    single { WeatherAlertWorkScheduler(get()) }
+	    single { WeatherRepository(get(), cityDao = get(), weatherDao = get()) }
+	    viewModel { WeatherViewModel(get()) }
+	 }
 
 
  val networkingModule = module {

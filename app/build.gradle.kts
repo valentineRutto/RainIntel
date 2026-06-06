@@ -117,6 +117,8 @@ dependencies {
     implementation(libs.androidx.room.ktx)
     implementation(libs.core.ktx)
     implementation(libs.androidx.compose.ui)
+    implementation(libs.androidx.work.runtime.ktx)
+    implementation(libs.work.runtime.ktx)
     ksp(libs.androidx.room.compiler)
 
     testImplementation(libs.junit)
