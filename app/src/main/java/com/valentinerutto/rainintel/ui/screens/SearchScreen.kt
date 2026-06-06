@@ -81,6 +81,7 @@ import com.valentinerutto.rainintel.ui.theme.RainBlue
 import com.valentinerutto.rainintel.ui.theme.RainIntelTheme
 import com.valentinerutto.rainintel.ui.theme.ScreenBackground
 import com.valentinerutto.rainintel.util.toDisplayCondition
+import com.valentinerutto.rainintel.util.toDisplayDateTime
 import org.koin.compose.viewmodel.koinViewModel
 
 private data class HourlyForecast(
@@ -450,7 +451,15 @@ private fun SavedCityRow(
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                 )
+
             }
+            Text(
+                text = city.time?.toDisplayDateTime()?.let { "$it" } ?: "updated time unavailable",
+                color = FieldGreen.copy(alpha = 0.78f),
+                fontSize = 13.sp,
+                maxLines = 3,
+                overflow = TextOverflow.Ellipsis,
+            )
             if (!isEditMode) {
                 Icon(
                     imageVector = Icons.Outlined.ChevronRight,
@@ -555,6 +564,7 @@ private fun CurrentWeatherCard(
                         modifier = Modifier.size(30.dp),
                     )
                 }
+
             }
 
             Column(
@@ -575,6 +585,13 @@ private fun CurrentWeatherCard(
                     color = FieldGreen.copy(alpha = 0.75f),
                     fontSize = 20.sp,
                     fontWeight = FontWeight.Medium,
+                )
+                Text(
+                    text = cityWeather?.time?.toDisplayDateTime()?.let { "$it" } ?: "updated time unavailable",
+                    color = FieldGreen.copy(alpha = 0.78f),
+                    fontSize = 13.sp,
+                    maxLines = 3,
+                    overflow = TextOverflow.Ellipsis,
                 )
             }
 
