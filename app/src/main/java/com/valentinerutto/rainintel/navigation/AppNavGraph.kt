@@ -1,5 +1,6 @@
 package com.valentinerutto.rainintel.navigation
 
+import android.net.Uri
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -34,10 +35,12 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavGraph.Companion.findStartDestination
+import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
+import androidx.navigation.navArgument
 import com.valentinerutto.rainintel.ui.screens.HomeScreen
 import com.valentinerutto.rainintel.ui.screens.SearchScreen
 import com.valentinerutto.rainintel.ui.theme.BottomNavContentInactive
@@ -56,6 +59,10 @@ private val bottomNavDestinations = listOf(
     BottomNavDestination("home", "Home", Icons.Filled.Home),
     BottomNavDestination("search", "Search", Icons.Filled.Search),
 )
+
+private const val HOME_ROUTE = "home"
+private const val SEARCH_ROUTE = "search"
+private const val HOME_ROUTE_WITH_ARGS = "home?lat={lat}&lng={lng}&name={name}"
 
 @Composable
 fun AppNavGraph() {
@@ -86,13 +93,50 @@ fun AppNavGraph() {
             startDestination = "home",
             modifier = Modifier.padding(innerPadding),
         ) {
-            composable("home") {
-                HomeScreen()
+            composable(
+                route = HOME_ROUTE_WITH_ARGS,
+                arguments = listOf(
+                    navArgument("lat") {
+                        type = NavType.StringType
+                        nullable = true
+                        defaultValue = null
+                    },
+                    navArgument("lng") {
+                        type = NavType.StringType
+                        nullable = true
+                        defaultValue = null
+                    },
+                    navArgument("name") {
+                        type = NavType.StringType
+                        nullable = true
+                        defaultValue = null
+                    },
+                )
+            ) { backStackEntry ->
+                HomeScreen(
+                    selectedCityLat = backStackEntry.arguments
+                        ?.getString("lat")
+                        ?.toDoubleOrNull(),
+                    selectedCityLng = backStackEntry.arguments
+                        ?.getString("lng")
+                        ?.toDoubleOrNull(),
+                    selectedCityName = backStackEntry.arguments?.getString("name"),
+                )
             }
 
-            composable("search") {
-                SearchScreen()
-
+            composable(SEARCH_ROUTE) {
+                SearchScreen(
+                    onRecentCityClick = { city ->
+                        navController.navigate(
+                            "$HOME_ROUTE?lat=${city.lat}&lng=${city.lng}&name=${Uri.encode(city.city)}"
+                        ) {
+                            popUpTo(navController.graph.findStartDestination().id) {
+                                inclusive = true
+                            }
+                            launchSingleTop = true
+                        }
+                    }
+                )
             }
         }
     }
@@ -116,7 +160,7 @@ private fun RainIntelBottomBar(
         destinations.forEach { destination ->
             BottomNavItem(
                 destination = destination,
-                selected = selectedRoute == destination.route,
+                selected = selectedRoute?.startsWith(destination.route) == true,
                 onClick = { onDestinationClick(destination) },
                 modifier = Modifier.weight(1f),
             )

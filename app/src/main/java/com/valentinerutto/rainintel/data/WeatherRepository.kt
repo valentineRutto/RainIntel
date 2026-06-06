@@ -52,6 +52,12 @@ class WeatherRepository(
         val weatherResponse = apiService.getWeatherByCity(city.city)
 
         val selectedCity = weatherResponse.toCityEntity(city)
+
+        weatherDao.replaceWeather(
+            currentWeather = weatherResponse.toWeatherEntity(),
+            dailyWeather = mapToDailyWeatherEntity(weatherResponse)
+        )
+
         cityDao.insertCityWeather(selectedCity)
 
         return selectedCity
@@ -97,7 +103,6 @@ class WeatherRepository(
 
         return cachedDate == today
     }
-
 
 }
 

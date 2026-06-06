@@ -79,14 +79,8 @@ import com.valentinerutto.rainintel.ui.theme.Mint
 import com.valentinerutto.rainintel.ui.theme.RainBlue
 import com.valentinerutto.rainintel.ui.theme.RainIntelTheme
 import com.valentinerutto.rainintel.ui.theme.ScreenBackground
+import com.valentinerutto.rainintel.util.toDisplayCondition
 import org.koin.compose.viewmodel.koinViewModel
-
-private data class RecentCity(
-    val name: String,
-    val country: String,
-    val temperature: String,
-    val saved: Boolean,
-)
 
 private data class SavedCity(
     val city: String,
@@ -102,38 +96,17 @@ private data class HourlyForecast(
     val selected: Boolean = false,
 )
 
-private fun CityEntity.toRecentCity(): RecentCity {
-    return RecentCity(
-        name = city,
-        country = country,
-        temperature = temperature?.toInt()?.let { "$it°" } ?: "--°",
-        saved = isSaved,
-    )
-}
-
-private fun String.toDisplayCondition(): String {
-    if (isBlank()) return "Weather unavailable"
-
-    return lowercase()
-        .replace('_', ' ')
-        .split(" ")
-        .filter { it.isNotBlank() }
-        .joinToString(" ") { word ->
-            word.replaceFirstChar { char -> char.uppercase() }
-        }
-}
 
 @Composable
 fun SearchScreen(
-    modifier: Modifier = Modifier,    viewModel: WeatherViewModel = koinViewModel()
-
+    modifier: Modifier = Modifier,
+    viewModel: WeatherViewModel = koinViewModel(),
+    onRecentCityClick: (CityEntity) -> Unit = {},
 ) {
 
     val searchQuery by viewModel.searchQuery.collectAsState()
 
     val state by viewModel.uiSearchState.collectAsStateWithLifecycle()
-
-    val recentCities = state.recentWeather.map { it.toRecentCity() }
 
     val savedCities = listOf(
         SavedCity("Paris", "France", "62°", "Partly Cloudy"),
@@ -179,7 +152,10 @@ fun SearchScreen(
                 action = "Clear All",
                 onActionClick = viewModel::clearRecentSearches,
             )
-            RecentSearchGrid(cities = recentCities)
+            RecentSearchGrid(
+                cities = state.recentWeather,
+                onCityClick = onRecentCityClick,
+            )
 
             state.errorMessage?.let { message ->
                 Text(
@@ -418,7 +394,8 @@ private fun SearchResultRow(
 
 @Composable
 private fun RecentSearchGrid(
-    cities: List<RecentCity>,
+    cities: List<CityEntity>,
+    onCityClick: (CityEntity) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     Column(
@@ -433,6 +410,7 @@ private fun RecentSearchGrid(
                 rowCities.forEach { city ->
                     RecentCityCard(
                         city = city,
+                        onClick = { onCityClick(city) },
                         modifier = Modifier.weight(1f),
                     )
                 }
@@ -446,11 +424,14 @@ private fun RecentSearchGrid(
 
 @Composable
 private fun RecentCityCard(
-    city: RecentCity,
+    city: CityEntity,
+    onClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     Surface(
-        modifier = modifier.height(136.dp),
+        modifier = modifier
+            .height(136.dp)
+            .clickable(onClick = onClick),
         shape = RoundedCornerShape(16.dp),
         color = InsightGreen,
     ) {
@@ -459,27 +440,34 @@ private fun RecentCityCard(
             verticalArrangement = Arrangement.SpaceBetween,
         ) {
             Icon(
-                imageVector = if (city.saved) Icons.Outlined.Star else Icons.Outlined.StarBorder,
+                imageVector = if (city.isSaved) Icons.Outlined.Star else Icons.Outlined.StarBorder,
                 contentDescription = null,
-                tint = if (city.saved) FreshGreen else BottomNavContentInactive,
+                tint = if (city.isSaved) FreshGreen else BottomNavContentInactive,
                 modifier = Modifier.size(24.dp),
             )
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                 Text(
-                    text = city.name,
+                    text = city.city,
                     color = FieldGreen,
                     fontSize = 18.sp,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                 )
                 Text(
-                    text = city.temperature,
+                    text = city.country,
+                    color = FieldGreen.copy(alpha = 0.68f),
+                    fontSize = 12.sp,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                Text(
+                    text = city.temperature?.toInt()?.let { "$it°" } ?: "--°",
                     color = FieldGreen,
                     fontSize = 30.sp,
                     fontWeight = FontWeight.SemiBold,
                 )
                 Text(
-                    text = city.country,
+                    text = city.condition_code?.toDisplayCondition() ?: "Weather unavailable",
                     color = FieldGreen.copy(alpha = 0.68f),
                     fontSize = 12.sp,
                     maxLines = 1,
@@ -564,6 +552,7 @@ private fun CurrentWeatherCard(
     modifier: Modifier = Modifier,
 ) {
     val cityName = cityWeather?.city ?: "Select a city"
+    val countryName = cityWeather?.country.orEmpty()
     val temperature = cityWeather?.temperature?.toInt()?.let { "$it°" } ?: "--°"
     val condition = cityWeather?.condition_code?.toDisplayCondition() ?: "Search for weather"
 
@@ -618,7 +607,18 @@ private fun CurrentWeatherCard(
                     color = FieldGreen,
                     fontSize = 28.sp,
                     fontWeight = FontWeight.SemiBold,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
                 )
+                if (countryName.isNotBlank()) {
+                    Text(
+                        text = countryName,
+                        color = FieldGreen.copy(alpha = 0.72f),
+                        fontSize = 16.sp,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
             }
 
             Column(

@@ -52,6 +52,7 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
@@ -106,6 +107,9 @@ import org.koin.androidx.compose.koinViewModel
 fun HomeScreen(
     modifier: Modifier = Modifier,
     weatherViewModel: WeatherViewModel = koinViewModel(),
+    selectedCityLat: Double? = null,
+    selectedCityLng: Double? = null,
+    selectedCityName: String? = null,
 ) {
 
     val context = LocalContext.current
@@ -117,6 +121,18 @@ fun HomeScreen(
     var locationName by remember { mutableStateOf("Current location") }
 
     val locationProvider = remember(context) { DeviceLocationProvider(context) }
+
+    LaunchedEffect(selectedCityLat, selectedCityLng, selectedCityName) {
+        val lat = selectedCityLat
+        val lng = selectedCityLng
+
+        if (lat != null && lng != null) {
+            selectedCityName?.takeIf { it.isNotBlank() }?.let { name ->
+                locationName = name
+            }
+            weatherViewModel.loadWeatherForSelectedCity(lat, lng)
+        }
+    }
 
     fun showLocationError(message: String, canTurnOnGps: Boolean = false) {
         locationErrorMessage = message

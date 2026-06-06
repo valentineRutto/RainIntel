@@ -68,7 +68,17 @@ private fun String.toDayLabel(): String {
     }
 }
 
+fun String.toDisplayCondition(): String {
+    if (isBlank()) return "Weather unavailable"
 
+    return lowercase()
+        .replace('_', ' ')
+        .split(" ")
+        .filter { it.isNotBlank() }
+        .joinToString(" ") { word ->
+            word.replaceFirstChar { char -> char.uppercase() }
+        }
+}
 
  fun String.toWeatherMarkerColor(): Color {
     val condition = lowercase()

@@ -125,6 +125,35 @@ class WeatherViewModel(private val repository: WeatherRepository) : ViewModel() 
         }
     }
 
+    fun loadWeatherForSelectedCity(lat: Double, lon: Double) {
+        viewModelScope.launch {
+            _uiState.update {
+                it.copy(
+                    isLoading = true,
+                    errorMessage = null
+                )
+            }
+
+            runCatching { repository.refreshWeather(lat, lon) }
+                .onSuccess {
+                    _uiState.update {
+                        it.copy(
+                            isLoading = false,
+                            errorMessage = null
+                        )
+                    }
+                }
+                .onFailure { throwable ->
+                    _uiState.update {
+                        it.copy(
+                            isLoading = false,
+                            errorMessage = throwable.message ?: "Unable to load weather"
+                        )
+                    }
+                }
+        }
+    }
+
 
     fun onCityClicked(city: PreloadedCityEntity) {
 
@@ -186,6 +215,7 @@ data class WeatherSearchUiState(
     val searchResults: List<PreloadedCityEntity> = emptyList(),
     val selectedCityWeather: CityEntity? = null,
     val recentWeather: List<CityEntity> = emptyList(),
+    val savedCityWeather: List<CityEntity> = emptyList(),
     val isLoading: Boolean = false,
     val errorMessage: String? = null
 )
