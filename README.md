@@ -98,6 +98,34 @@ flowchart TD
 - Saved cities with edit/remove mode
 - Current-location refresh
 
+## Setup
+
+RainIntel requires a Weather AI API key to fetch live weather data.
+
+1. Create an API key from the Weather AI dashboard.
+2. See the API docs: [weather-ai.co/docs](https://weather-ai.co/docs).
+3. Add the key to `local.properties`:
+
+```properties
+WEATHER_API_KEY=wai_your_key_here
+```
+
+The app sends the key as a Bearer token when calling the Weather AI API.
+
+## Widget Install Guide
+
+The RainIntel widget shows the latest cached weather from the app database. It updates when the app is opened and weather is refreshed.
+
+1. Install and open RainIntel at least once.
+2. Grant location permission and refresh weather so the app can cache the latest forecast.
+3. Go to the Android home screen.
+4. Long-press an empty area on the home screen.
+5. Tap **Widgets**.
+6. Find **RainIntel**.
+7. Drag the widget onto the home screen.
+8. Tap the widget to open RainIntel.
+
+If no weather has been cached yet, the widget shows `--°` and asks the user to open RainIntel to load weather.
 
 ## Tech Stack
 
