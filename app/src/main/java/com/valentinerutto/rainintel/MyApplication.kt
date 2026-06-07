@@ -9,6 +9,7 @@ import com.valentinerutto.rainintel.di.appModule
 import com.valentinerutto.rainintel.di.databaseModule
 import com.valentinerutto.rainintel.di.networkingModule
 import com.valentinerutto.rainintel.util.WeatherNotificationHelper
+import com.valentinerutto.rainintel.widget.RainIntelWidgetUpdater
 import com.valentinerutto.rainintel.worker.RainIntelWorkerFactory
 import com.valentinerutto.rainintel.worker.WeatherAlertWorkScheduler
 import kotlinx.coroutines.CoroutineScope
@@ -26,6 +27,7 @@ class MyApplication: Application() {
     private val notificationHelper: WeatherNotificationHelper by inject()
     private val workerFactory: RainIntelWorkerFactory by inject()
     private val weatherAlertWorkScheduler: WeatherAlertWorkScheduler by inject()
+    private val widgetUpdater: RainIntelWidgetUpdater by inject()
     private val applicationScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
     companion object {
@@ -55,6 +57,7 @@ class MyApplication: Application() {
 
         notificationHelper.createNotificationChannel()
         weatherAlertWorkScheduler.schedule()
+        widgetUpdater.updateAll()
 
         applicationScope.launch {
             runCatching {

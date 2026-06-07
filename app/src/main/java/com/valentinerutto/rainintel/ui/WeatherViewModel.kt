@@ -6,6 +6,7 @@ import com.valentinerutto.rainintel.data.WeatherRepository
 import com.valentinerutto.rainintel.data.local.CityEntity
 import com.valentinerutto.rainintel.data.local.PreloadedCityEntity
 import com.valentinerutto.rainintel.data.models.WeatherUiData
+import com.valentinerutto.rainintel.widget.RainIntelWidgetUpdater
 import kotlinx.coroutines.FlowPreview
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -16,7 +17,10 @@ import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
-class WeatherViewModel(private val repository: WeatherRepository) : ViewModel() {
+class WeatherViewModel(
+    private val repository: WeatherRepository,
+    private val widgetUpdater: RainIntelWidgetUpdater? = null
+) : ViewModel() {
 
     private val _uiState = MutableStateFlow(WeatherUiState())
     val uiState: StateFlow<WeatherUiState> = _uiState.asStateFlow()
@@ -118,6 +122,7 @@ class WeatherViewModel(private val repository: WeatherRepository) : ViewModel() 
 
             runCatching { repository.getWeather(lat, lon) }
                 .onSuccess {
+                    widgetUpdater?.updateAll()
                     _uiState.update {
                         it.copy(
                             isLoading = false,
@@ -147,6 +152,7 @@ class WeatherViewModel(private val repository: WeatherRepository) : ViewModel() 
 
             runCatching { repository.refreshWeatherForLocation(lat, lon) }
                 .onSuccess {
+                    widgetUpdater?.updateAll()
                     _uiState.update {
                         it.copy(
                             isLoading = false,
@@ -176,6 +182,7 @@ class WeatherViewModel(private val repository: WeatherRepository) : ViewModel() 
 
             runCatching { repository.refreshWeatherForLocation(lat, lon) }
                 .onSuccess {
+                    widgetUpdater?.updateAll()
                     _uiState.update {
                         it.copy(
                             isLoading = false,
@@ -207,6 +214,7 @@ class WeatherViewModel(private val repository: WeatherRepository) : ViewModel() 
 
             runCatching { repository.refreshWeatherForPreloadedCity(city) }
                 .onSuccess { weather ->
+                    widgetUpdater?.updateAll()
 
                     _searchQuery.value = ""
 

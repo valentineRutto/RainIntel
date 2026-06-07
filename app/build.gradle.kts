@@ -113,6 +113,7 @@ dependencies {
     implementation(libs.opencsv)
 
     implementation(libs.coil.compose)
+    implementation(libs.coil.svg)
     implementation(libs.androidx.navigation.compose)
     implementation(libs.androidx.room.ktx)
     implementation(libs.core.ktx)

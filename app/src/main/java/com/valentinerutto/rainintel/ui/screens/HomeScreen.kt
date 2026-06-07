@@ -73,6 +73,9 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import coil.compose.SubcomposeAsyncImage
+import coil.decode.SvgDecoder
+import coil.request.ImageRequest
 import com.valentinerutto.rainintel.R
 import com.valentinerutto.rainintel.data.local.WeatherEntity
 import com.valentinerutto.rainintel.data.models.ForecastDay
@@ -103,6 +106,7 @@ import com.valentinerutto.rainintel.util.toWeatherIcon
 import com.valentinerutto.rainintel.util.toWeatherMarkerColor
 import com.valentinerutto.rainintel.util.updatedTimeLabel
 import com.valentinerutto.rainintel.util.withSelectedIndex
+import com.valentinerutto.rainintel.widget.WidgetLocationStore
 import kotlinx.coroutines.launch
 import org.koin.androidx.compose.koinViewModel
 
@@ -131,6 +135,7 @@ fun HomeScreen(
     var locationName by remember { mutableStateOf("Current location") }
 
     val locationProvider = remember(context) { DeviceLocationProvider(context) }
+    val widgetLocationStore = remember(context) { WidgetLocationStore(context) }
     var hasLocationPermission by remember {
         mutableStateOf(locationProvider.hasLocationPermission())
     }
@@ -144,6 +149,10 @@ fun HomeScreen(
     }
     var isResolvingLocation by remember { mutableStateOf(false) }
     val isHomeLoading = uiState.isLoading || isResolvingLocation
+
+    LaunchedEffect(locationName) {
+        widgetLocationStore.saveLocationName(locationName)
+    }
 
     fun showLocationError(message: String, canTurnOnGps: Boolean = false) {
         locationErrorMessage = message
@@ -349,12 +358,14 @@ private data class DashboardWeather(
     val humidity: String,
     val windSpeed: String,
     val uvIndex: String,
-    val icon: ImageVector,
+    val iconUrl: String,
+    val fallbackIcon: ImageVector,
 )
 
 private data class DashboardForecastRow(
     val day: String,
-    val icon: ImageVector,
+    val iconUrl: String,
+    val fallbackIcon: ImageVector,
     val rainChance: String,
     val highTemp: String,
     val lowTemp: String,
@@ -374,7 +385,8 @@ private fun WeatherUiData?.toDashboardWeather(): DashboardWeather {
         humidity = today?.precipitation_probability?.let { "$it%" } ?: "--",
         windSpeed = current?.wind_speed?.toInt()?.let { "$it mph" } ?: "--",
         uvIndex = "4",
-        icon = condition.toWeatherIcon()
+        iconUrl = current?.iconUrl().orEmpty(),
+        fallbackIcon = condition.toWeatherIcon(),
     )
 }
 
@@ -383,7 +395,15 @@ private fun WeatherUiData?.toDashboardForecastRows(): List<DashboardForecastRow>
 
     if (daily.isEmpty()) {
         return listOf(
-            DashboardForecastRow("Today", icon = Icons.Outlined.Minimize, "--", "--", "--", DeepGreen),
+            DashboardForecastRow(
+                day = "Today",
+                iconUrl = "",
+                fallbackIcon = Icons.Outlined.Minimize,
+                rainChance = "--",
+                highTemp = "--",
+                lowTemp = "--",
+                iconTint = DeepGreen
+            ),
       )
     }
 
@@ -391,7 +411,8 @@ private fun WeatherUiData?.toDashboardForecastRows(): List<DashboardForecastRow>
         val condition = day.condition_code.toDisplayCondition()
         DashboardForecastRow(
             day = if (index == 0) "Today" else day.dayOfTheWeek,
-            icon = condition.toWeatherIcon(),
+            iconUrl = day.iconUrl(),
+            fallbackIcon = condition.toWeatherIcon(),
             rainChance = "${day.precipitation_probability}%",
             highTemp = "${day.temp_max.toInt()}°",
             lowTemp = "${day.temp_min.toInt()}°",
@@ -400,7 +421,10 @@ private fun WeatherUiData?.toDashboardForecastRows(): List<DashboardForecastRow>
     }
 }
 
+private fun WeatherEntity.iconUrl(): String = icon.ifBlank { icon_path }
 
+private fun com.valentinerutto.rainintel.data.local.DailyWeatherEntity.iconUrl(): String =
+    icon.ifBlank { icon_path }
 
 @Composable
 private fun DashboardHero(
@@ -414,9 +438,9 @@ private fun DashboardHero(
             .padding(horizontal = 22.dp, vertical = 54.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
-        Icon(
-            imageVector = weather.icon,
-            contentDescription = null,
+        WeatherConditionImage(
+            iconUrl = weather.iconUrl,
+            fallbackIcon = weather.fallbackIcon,
             tint = DeepGreen,
             modifier = Modifier.size(92.dp),
         )
@@ -609,9 +633,9 @@ private fun ForecastListRow(
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
         )
-        Icon(
-            imageVector = day.icon,
-            contentDescription = null,
+        WeatherConditionImage(
+            iconUrl = day.iconUrl,
+            fallbackIcon = day.fallbackIcon,
             tint = day.iconTint,
             modifier = Modifier.size(30.dp),
         )
@@ -649,6 +673,50 @@ private fun ForecastListRow(
             modifier = Modifier.width(48.dp),
         )
     }
+}
+
+@Composable
+private fun WeatherConditionImage(
+    iconUrl: String,
+    fallbackIcon: ImageVector,
+    tint: Color,
+    modifier: Modifier = Modifier,
+) {
+    if (iconUrl.isBlank()) {
+        Icon(
+            imageVector = fallbackIcon,
+            contentDescription = null,
+            tint = tint,
+            modifier = modifier,
+        )
+        return
+    }
+
+    SubcomposeAsyncImage(
+        model = ImageRequest.Builder(LocalContext.current)
+            .data(iconUrl)
+            .decoderFactory(SvgDecoder.Factory())
+            .crossfade(true)
+            .build(),
+        contentDescription = null,
+        modifier = modifier,
+        loading = {
+            Icon(
+                imageVector = fallbackIcon,
+                contentDescription = null,
+                tint = tint,
+                modifier = Modifier.fillMaxSize(),
+            )
+        },
+        error = {
+            Icon(
+                imageVector = fallbackIcon,
+                contentDescription = null,
+                tint = tint,
+                modifier = Modifier.fillMaxSize(),
+            )
+        },
+    )
 }
 
 
