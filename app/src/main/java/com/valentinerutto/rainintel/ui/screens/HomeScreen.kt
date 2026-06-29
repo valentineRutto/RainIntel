@@ -758,7 +758,7 @@ private suspend fun loadWeatherFromCurrentLocation(
         }
 
         LocationResult.LocationUnavailable -> {
-            onLocationError("Turn on GPS to load weather for your current location", true)
+            onLocationError("Please Turn on GPS to load weather for your current location", true)
         }
 
         is LocationResult.Error -> {
