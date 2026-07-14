@@ -2,6 +2,7 @@ package com.valentinerutto.rainintel.data.local
 
 import androidx.room.Entity
 import androidx.room.PrimaryKey
+import com.valentinerutto.rainintel.data.models.CurrentWeatherResponse
 import com.valentinerutto.rainintel.data.network.response.WeatherResponse
 import com.valentinerutto.rainintel.util.toDayOfWeek
 
@@ -18,16 +19,16 @@ data class WeatherEntity(
     val wind_speed: Double
 )
 
-fun WeatherResponse.toWeatherEntity(): WeatherEntity {
-    val currentWeather = current
-    return WeatherEntity(
-        condition_code = currentWeather?.condition_code.orEmpty(),
+fun CurrentWeatherResponse.toWeatherEntity(): WeatherEntity {
+    val currentWeather = weathers?.firstOrNull()
+     return WeatherEntity(
+        condition_code = currentWeather?.main?.get(0)?.code.toString(),
         icon = currentWeather?.icon.orEmpty(),
-        icon_path = currentWeather?.icon_path.orEmpty(),
-        temperature = currentWeather?.temperature ?: 0.0,
-        time = currentWeather?.time.orEmpty(),
-        wind_direction = currentWeather?.wind_direction ?: 0.0,
-        wind_speed = currentWeather?.wind_speed ?: 0.0
+        icon_path = currentWeather?.icon.orEmpty(),
+        temperature = main?.temperature?.toDouble()?:0.0,
+        time = System.currentTimeMillis().toString(),
+        wind_direction = currentWeather?.description?.toDouble() ?: 0.0,
+        wind_speed = main?.temperatureMax?.toDouble()?:0.0,
     )
 }
 

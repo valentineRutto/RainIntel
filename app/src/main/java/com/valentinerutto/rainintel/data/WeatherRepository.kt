@@ -8,6 +8,7 @@ import com.valentinerutto.rainintel.data.local.WeatherEntity
 import com.valentinerutto.rainintel.data.local.mapToDailyWeatherEntity
 import com.valentinerutto.rainintel.data.local.toCityEntity
 import com.valentinerutto.rainintel.data.local.toWeatherEntity
+import com.valentinerutto.rainintel.data.models.CurrentWeatherResponse
 import com.valentinerutto.rainintel.data.models.WeatherUiData
 import com.valentinerutto.rainintel.data.network.ApiService
 import com.valentinerutto.rainintel.data.network.response.WeatherResponse
@@ -108,8 +109,8 @@ class WeatherRepository(
         )
     }
 
-    suspend fun refreshWeatherForLocation(lat: Double, lon: Double): WeatherResponse {
-        val weatherResponse = apiService.getWeather(lat, lon)
+    suspend fun refreshWeatherForLocation(lat: Double, lon: Double): CurrentWeatherResponse {
+        val weatherResponse = apiService.getCurrentWeather(lat.toString(), lon.toString())
         weatherDao.replaceWeather(
             currentWeather = weatherResponse.toWeatherEntity(),
             dailyWeather = mapToDailyWeatherEntity(weatherResponse)
